@@ -1,0 +1,10 @@
+{
+  "name": "call-crm",
+  "private": true,
+  "scripts": {
+    "web": "npm run dev --prefix apps/web",
+    "web:build": "npm run build --prefix apps/web",
+    "web:start": "npm run start --prefix apps/web",
+    "mobile": "npm run start --prefix apps/mobile"
+  }
+}
