@@ -1,6 +1,7 @@
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 
+import type { DeviceLocation } from '../modules/call-log';
 import { API_URL } from './config';
 
 export class ApiError extends Error {
@@ -31,7 +32,7 @@ export const verifyClient = (clientCode: string) =>
   request<{ companyName: string }>('/api/app/verify-client', { clientCode });
 
 export const login = (clientCode: string, username: string, password: string) =>
-  request<{ token: string; agent: { name: string }; company: { name: string }; syncFrom: number }>('/api/app/login', {
+  request<{ token: string; agent: { name: string; phone: string | null }; company: { name: string }; syncFrom: number }>('/api/app/login', {
     clientCode,
     username,
     password,
@@ -40,5 +41,5 @@ export const login = (clientCode: string, username: string, password: string) =>
 
 export const uploadCalls = (token: string, calls: unknown[]) => request<{ saved: number }>('/api/app/calls', { calls }, token);
 
-export const heartbeat = (token: string, permissionsOk: boolean) =>
-  request<{ ok: boolean }>('/api/app/heartbeat', { permissionsOk, appVersion }, token);
+export const heartbeat = (token: string, permissionsOk: boolean, location?: DeviceLocation | null) =>
+  request<{ ok: boolean }>('/api/app/heartbeat', { permissionsOk, appVersion, location: location ?? null }, token);

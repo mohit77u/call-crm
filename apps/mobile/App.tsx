@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import CallLog from './modules/call-log';
+import type { SimInfo } from './modules/call-log';
 import { login, verifyClient } from './src/api';
 import { startBackgroundSync, stopBackgroundSync } from './src/backgroundSync';
 import {
@@ -110,7 +111,13 @@ function LoginScreen(props: { clientCode: string; companyName: string; onBack: (
     setError('');
     try {
       const res = await login(props.clientCode, username.trim(), password);
-      const session: Session = { token: res.token, agentName: res.agent.name, companyName: res.company.name, syncFrom: res.syncFrom };
+      const session: Session = {
+        token: res.token,
+        agentName: res.agent.name,
+        companyName: res.company.name,
+        agentPhone: res.agent.phone,
+        syncFrom: res.syncFrom,
+      };
       await saveSession(session);
       props.onLoggedIn(session);
     } catch (e) {
@@ -136,6 +143,8 @@ function LoginScreen(props: { clientCode: string; companyName: string; onBack: (
 }
 
 function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: () => void }) {
+  const [sess, setSess] = useState(session);
+  const [pickingSim, setPickingSim] = useState(!session.sim);
   const [hasPermission, setHasPermission] = useState(CallLog.hasPermission());
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [message, setMessage] = useState('');
@@ -158,12 +167,13 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
   }, [onLoggedOut]);
 
   const askPermission = async () => {
-    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_CALL_LOG, {
-      title: 'Call log access',
-      message: `${session.companyName} uses your call history (number, time, duration) to show your calls in the company CRM.`,
-      buttonPositive: 'Allow',
-    });
-    if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+    const result = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+      PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+    ]);
+    if (Object.values(result).includes(PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN)) {
       setMessage('Permission blocked. Enable "Call logs" in app settings.');
       Linking.openSettings();
     }
@@ -190,16 +200,25 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (pickingSim) {
+    return <SimPicker agentPhone={sess.agentPhone} onDone={(s) => { setSess(s); setPickingSim(false); }} />;
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.home}>
-      <Text style={styles.title}>Hi, {session.agentName}</Text>
-      <Text style={styles.muted}>{session.companyName}</Text>
+      <Text style={styles.title}>Hi, {sess.agentName}</Text>
+      <Text style={styles.muted}>{sess.companyName}</Text>
 
       <View style={styles.card}>
         <Row label="Call log permission" value={hasPermission ? 'Allowed' : 'Not allowed'} ok={hasPermission} />
+        <Row label="Work SIM" value={sess.sim?.label ?? 'Not selected'} ok={!!sess.sim} />
         <Row label="Last sync" value={lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'Not yet'} ok={!!lastSyncAt} />
         {!!message && <Text style={[styles.muted, { marginTop: 8 }]}>{message}</Text>}
       </View>
+
+      <Pressable onPress={() => setPickingSim(true)} style={{ marginTop: 12, alignSelf: 'center' }}>
+        <Text style={styles.link}>Change work SIM</Text>
+      </Pressable>
 
       {!hasPermission && <Button title="Allow call log access" onPress={askPermission} />}
       <Button title="Sync now" onPress={syncNow} busy={busy} />
@@ -218,6 +237,50 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
       <Pressable onPress={logout} style={{ marginTop: 24, alignSelf: 'center' }}>
         <Text style={[styles.link, { color: '#c62828' }]}>Logout</Text>
       </Pressable>
+    </ScrollView>
+  );
+}
+
+function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone: (s: Session) => void }) {
+  const [sims, setSims] = useState<SimInfo[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    CallLog.listSims().then(setSims).catch(() => setSims([]));
+  }, []);
+
+  const choose = async (sim: SimInfo) => {
+    setBusy(true);
+    const session = await getSession();
+    if (session) {
+      const updated: Session = {
+        ...session,
+        sim: { iccId: sim.iccId, label: sim.label ?? `SIM ${sim.id}`, subId: sim.id },
+      };
+      await saveSession(updated);
+      onDone(updated);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.center}>
+      <Text style={styles.title}>Select work SIM</Text>
+      <Text style={styles.muted}>
+        {agentPhone
+          ? `Choose the SIM that has number ${agentPhone}. Only calls on this SIM will be sent to the CRM.`
+          : 'Choose the SIM used for work calls. Only calls on this SIM will be sent to the CRM.'}
+      </Text>
+      {sims === null && <ActivityIndicator style={{ marginTop: 24 }} />}
+      {sims?.map((s, i) => (
+        <Button
+          key={s.id}
+          title={`${s.label ?? `SIM ${i + 1}`}${s.number ? ` · ${s.number}` : ''}`}
+          onPress={() => choose(s)}
+          busy={busy}
+        />
+      ))}
+      {sims?.length === 0 && <Text style={[styles.muted, { marginTop: 16 }]}>No SIM found. Check that a SIM is inserted.</Text>}
     </ScrollView>
   );
 }

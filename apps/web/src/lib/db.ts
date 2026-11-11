@@ -1,4 +1,5 @@
 import { Pool, type QueryResultRow } from "pg";
+import { hashPassword } from "./password";
 
 const globalForDb = globalThis as unknown as { pool?: Pool; migrated?: Promise<void> };
 
@@ -44,8 +45,16 @@ CREATE TABLE IF NOT EXISTS devices (
   revoked BOOLEAN NOT NULL DEFAULT false,
   last_seen_at TIMESTAMPTZ,
   last_sync_at TIMESTAMPTZ,
+  last_lat DOUBLE PRECISION,
+  last_lng DOUBLE PRECISION,
+  location_at TIMESTAMPTZ,
+  location_accuracy DOUBLE PRECISION,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_lat DOUBLE PRECISION;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_lng DOUBLE PRECISION;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_at TIMESTAMPTZ;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_accuracy DOUBLE PRECISION;
 CREATE TABLE IF NOT EXISTS call_logs (
   id BIGSERIAL PRIMARY KEY,
   company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -64,10 +73,39 @@ CREATE TABLE IF NOT EXISTS call_logs (
 );
 CREATE INDEX IF NOT EXISTS call_logs_company_started ON call_logs (company_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS call_logs_agent_started ON call_logs (agent_id, started_at DESC);
+CREATE TABLE IF NOT EXISTS superadmins (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL,
+  role TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS password_resets_email ON password_resets (email);
 `;
 
+async function seedSuperadmin() {
+  const email = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SUPERADMIN_PASSWORD ?? "";
+  if (!email || password.length < 8) return;
+  const existing = await pool.query("SELECT 1 FROM superadmins WHERE email = $1", [email]);
+  if (existing.rows[0]) return;
+  await pool.query("INSERT INTO superadmins (name, email, password_hash) VALUES ($1, $2, $3)", [
+    "Admin",
+    email,
+    await hashPassword(password),
+  ]);
+}
+
 function migrate() {
-  globalForDb.migrated ??= pool.query(schema).then(() => undefined);
+  globalForDb.migrated ??= pool.query(schema).then(() => seedSuperadmin());
   return globalForDb.migrated;
 }
 

@@ -9,3 +9,17 @@ export type DeviceCall = {
   durationSec: number;
   sim: string | null;
 };
+
+export type SimInfo = {
+  id: number;
+  iccId: string | null;
+  label: string | null;
+  number: string | null;
+};
+
+export type DeviceLocation = {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  time: number;
+};

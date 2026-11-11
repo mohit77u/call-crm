@@ -1,10 +1,12 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
-import type { DeviceCall } from './CallLog.types';
+import type { DeviceCall, DeviceLocation, SimInfo } from './CallLog.types';
 
 declare class CallLogModule extends NativeModule<{}> {
   hasPermission(): boolean;
-  getCallsSince(sinceMs: number, limit: number): Promise<DeviceCall[]>;
+  listSims(): Promise<SimInfo[]>;
+  getLastLocation(): Promise<DeviceLocation | null>;
+  getCallsSince(sinceMs: number, limit: number, phoneAccountId?: string | null): Promise<DeviceCall[]>;
 }
 
 export default requireNativeModule<CallLogModule>('CallLog');

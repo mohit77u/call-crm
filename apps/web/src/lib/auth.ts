@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { queryOne } from "./db";
 
 const SESSION_COOKIE = "crm_session";
+const PLATFORM_COOKIE = "crm_platform";
 const SESSION_DAYS = 7;
 
 function secret() {
@@ -13,9 +14,10 @@ function secret() {
 }
 
 type AdminSession = { typ: "admin"; adminId: number; companyId: number };
+type PlatformSession = { typ: "platform"; superadminId: number };
 export type AppSession = { typ: "app"; deviceId: number; agentId: number; companyId: number };
 
-async function sign(payload: AdminSession | AppSession, expiresIn: string) {
+async function sign(payload: AdminSession | AppSession | PlatformSession, expiresIn: string) {
   return new SignJWT(payload).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime(expiresIn).sign(secret());
 }
 
@@ -42,6 +44,35 @@ export async function startAdminSession(adminId: number, companyId: number) {
 
 export async function endAdminSession() {
   (await cookies()).delete(SESSION_COOKIE);
+}
+
+export async function startPlatformSession(superadminId: number) {
+  const token = await sign({ typ: "platform", superadminId }, `${SESSION_DAYS}d`);
+  (await cookies()).set(PLATFORM_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_DAYS * 24 * 3600,
+  });
+}
+
+export async function endPlatformSession() {
+  (await cookies()).delete(PLATFORM_COOKIE);
+}
+
+export type CurrentSuperadmin = { id: number; name: string; email: string };
+
+export async function getSuperadmin(): Promise<CurrentSuperadmin | null> {
+  const session = await verify<PlatformSession>((await cookies()).get(PLATFORM_COOKIE)?.value, "platform");
+  if (!session) return null;
+  return queryOne<CurrentSuperadmin>("SELECT id, name, email FROM superadmins WHERE id = $1", [session.superadminId]);
+}
+
+export async function requireSuperadmin() {
+  const admin = await getSuperadmin();
+  if (!admin) redirect("/admin/login");
+  return admin;
 }
 
 export type CurrentAdmin = { id: number; name: string; email: string; companyId: number; companyName: string; clientCode: string };

@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
-export type Session = { token: string; agentName: string; companyName: string; syncFrom: number };
+export type SessionSim = { iccId: string | null; label: string; subId: number };
+export type Session = { token: string; agentName: string; companyName: string; agentPhone?: string | null; syncFrom: number; sim?: SessionSim | null };
 
 const KEYS = { session: 'session', lastSyncAt: 'lastSyncAt', clientCode: 'clientCode' } as const;
 

@@ -1,8 +1,12 @@
 package expo.modules.calllog
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import android.provider.CallLog
+import android.telephony.SubscriptionManager
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -17,7 +21,46 @@ class CallLogModule : Module() {
       hasPermission()
     }
 
-    AsyncFunction("getCallsSince") { sinceMs: Double, limit: Int ->
+    AsyncFunction("listSims") {
+      val context = appContext.reactContext ?: throw CodedException("React context is not available")
+      val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+        ?: return@AsyncFunction emptyList<Map<String, Any?>>()
+      (sm.activeSubscriptionInfoList ?: emptyList()).map { info ->
+        mapOf(
+          "id" to info.subscriptionId,
+          "iccId" to info.iccId,
+          "label" to (info.carrierName ?: info.displayName)?.toString(),
+          "number" to info.number,
+        )
+      }
+    }
+
+    AsyncFunction("getLastLocation") {
+      val context = appContext.reactContext ?: throw CodedException("React context is not available")
+      val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        ?: return@AsyncFunction null
+      var best: Location? = null
+      for (provider in lm.getProviders(true)) {
+        val loc = try {
+          lm.getLastKnownLocation(provider)
+        } catch (e: SecurityException) {
+          null
+        } ?: continue
+        if (best == null || loc.time > best!!.time || (loc.time == best!!.time && loc.accuracy < best!!.accuracy)) {
+          best = loc
+        }
+      }
+      best?.let {
+        mapOf(
+          "lat" to it.latitude,
+          "lng" to it.longitude,
+          "accuracy" to it.accuracy,
+          "time" to it.time,
+        )
+      }
+    }
+
+    AsyncFunction("getCallsSince") { sinceMs: Double, limit: Int, phoneAccountId: String? ->
       if (!hasPermission()) throw CallLogPermissionException()
       val context = appContext.reactContext ?: throw CodedException("React context is not available")
       val projection = arrayOf(
@@ -29,12 +72,22 @@ class CallLogModule : Module() {
         CallLog.Calls.DURATION,
         CallLog.Calls.PHONE_ACCOUNT_ID,
       )
+      val selection = if (phoneAccountId != null) {
+        "${CallLog.Calls.DATE} > ? AND ${CallLog.Calls.PHONE_ACCOUNT_ID} = ?"
+      } else {
+        "${CallLog.Calls.DATE} > ?"
+      }
+      val selectionArgs = if (phoneAccountId != null) {
+        arrayOf(sinceMs.toLong().toString(), phoneAccountId)
+      } else {
+        arrayOf(sinceMs.toLong().toString())
+      }
       val calls = mutableListOf<Map<String, Any?>>()
       context.contentResolver.query(
         CallLog.Calls.CONTENT_URI,
         projection,
-        "${CallLog.Calls.DATE} > ?",
-        arrayOf(sinceMs.toLong().toString()),
+        selection,
+        selectionArgs,
         "${CallLog.Calls.DATE} ASC",
       )?.use { cursor ->
         val idIdx = cursor.getColumnIndexOrThrow(CallLog.Calls._ID)

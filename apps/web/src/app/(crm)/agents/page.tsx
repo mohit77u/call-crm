@@ -4,7 +4,7 @@ import { formatDateTime } from "@/lib/calls";
 import { createAgent, resetAgentPassword, revokeDevice, setAgentActive } from "./actions";
 
 type Agent = { id: number; name: string; username: string; phone: string | null; active: boolean };
-type Device = { id: number; agent_id: number; model: string | null; os_version: string | null; app_version: string | null; permissions_ok: boolean | null; last_seen_at: Date | null; last_sync_at: Date | null; created_at: Date };
+type Device = { id: number; agent_id: number; model: string | null; os_version: string | null; app_version: string | null; permissions_ok: boolean | null; last_seen_at: Date | null; last_sync_at: Date | null; last_lat: number | null; last_lng: number | null; location_at: Date | null; created_at: Date };
 
 export default async function AgentsPage({ searchParams }: PageProps<"/agents">) {
   const admin = await requireAdmin();
@@ -53,6 +53,19 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
                         {d.model ?? "Phone"} (Android {d.os_version ?? "?"}, app {d.app_version ?? "?"})
                         {d.permissions_ok === false && <span className="badge missed" style={{ marginLeft: 6 }}>Permission off</span>}
                         <div className="muted">Last sync: {d.last_sync_at ? formatDateTime(d.last_sync_at) : "never"}</div>
+                        {d.last_lat != null && d.last_lng != null && (
+                          <div className="muted">
+                            Last location:{" "}
+                            <a
+                              href={`https://maps.google.com/?q=${d.last_lat},${d.last_lng}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {d.last_lat.toFixed(5)}, {d.last_lng.toFixed(5)}
+                            </a>
+                            {d.location_at ? ` · ${formatDateTime(d.location_at)}` : ""}
+                          </div>
+                        )}
                         <form action={revokeDevice} className="inline">
                           <input type="hidden" name="id" value={d.id} />
                           <button className="secondary" type="submit">Disconnect</button>
