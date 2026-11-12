@@ -66,7 +66,7 @@ class CallLogModule : Module() {
       }
     }
 
-    AsyncFunction("getCallsSince") { sinceMs: Double, limit: Int, phoneAccountId: String? ->
+    AsyncFunction("getCallsSince") { sinceMs: Double, limit: Int, phoneAccountId: String?, iccId: String? ->
       if (!hasPermission()) throw CallLogPermissionException()
       val context = appContext.reactContext ?: throw CodedException("React context is not available")
       val projection = arrayOf(
@@ -78,15 +78,20 @@ class CallLogModule : Module() {
         CallLog.Calls.DURATION,
         CallLog.Calls.PHONE_ACCOUNT_ID,
       )
-      val selection = if (phoneAccountId != null) {
-        "${CallLog.Calls.DATE} > ? AND ${CallLog.Calls.PHONE_ACCOUNT_ID} = ?"
-      } else {
-        "${CallLog.Calls.DATE} > ?"
+      // PHONE_ACCOUNT_ID stores the ICCID on some devices and the subscription
+      // id on others — match either so SIM filtering works everywhere.
+      val selection = when {
+        phoneAccountId != null && iccId != null ->
+          "${CallLog.Calls.DATE} > ? AND ${CallLog.Calls.PHONE_ACCOUNT_ID} IN (?, ?)"
+        phoneAccountId != null ->
+          "${CallLog.Calls.DATE} > ? AND ${CallLog.Calls.PHONE_ACCOUNT_ID} = ?"
+        else -> "${CallLog.Calls.DATE} > ?"
       }
-      val selectionArgs = if (phoneAccountId != null) {
-        arrayOf(sinceMs.toLong().toString(), phoneAccountId)
-      } else {
-        arrayOf(sinceMs.toLong().toString())
+      val selectionArgs = when {
+        phoneAccountId != null && iccId != null ->
+          arrayOf(sinceMs.toLong().toString(), phoneAccountId, iccId)
+        phoneAccountId != null -> arrayOf(sinceMs.toLong().toString(), phoneAccountId)
+        else -> arrayOf(sinceMs.toLong().toString())
       }
       val calls = mutableListOf<Map<String, Any?>>()
       context.contentResolver.query(

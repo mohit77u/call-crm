@@ -45,22 +45,24 @@ async function doSync(): Promise<SyncResult> {
     if (!permissionsOk) return { ok: false, reason: 'no_permission' };
     if (!session.sim && !session.simAll) return { ok: true, uploaded: 0 };
 
-    // simAll → sync call logs from every SIM (phoneAccountId = null).
+    // simAll → sync call logs from every SIM (no SIM filter).
     // Each uploaded call still carries its own PHONE_ACCOUNT_ID in `sim`.
-    let phoneAccountId: string | null = null;
+    // PHONE_ACCOUNT_ID holds the ICCID on some devices and the subscription id
+    // on others, so pass both identifiers for filtering.
+    let simFilter: { id: string; iccId: string | null } | null = null;
     if (session.sim) {
       const { sims } = await CallLog.listSims().catch(() => ({ sims: [], slotCount: 0 }));
       const selectedSim = await resolveSelectedSim(sims, session.sim);
       if (!selectedSim) {
         return { ok: false, reason: 'sim_unavailable', message: 'Selected SIM is not active. Please select the correct work SIM.' };
       }
-      phoneAccountId = String(selectedSim.id);
+      simFilter = { id: String(selectedSim.id), iccId: selectedSim.iccId ?? null };
     }
 
     let uploaded = 0;
     let since = session.syncFrom;
     for (;;) {
-      const calls = await CallLog.getCallsSince(since, BATCH, phoneAccountId);
+      const calls = await CallLog.getCallsSince(since, BATCH, simFilter?.id ?? null, simFilter?.iccId ?? null);
       if (calls.length === 0) break;
       await uploadCalls(session.token, calls);
       uploaded += calls.length;
