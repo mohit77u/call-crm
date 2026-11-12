@@ -415,6 +415,7 @@ th { position: sticky; top: 0; background: #fff; }
   border: none; background: transparent; text-align: left; padding: 9px 12px;
   border-radius: 7px; font-size: 13.5px; color: var(--text); cursor: pointer; font-weight: 500;
 }
+.dropdown.up { top: auto; bottom: calc(100% + 4px); }
 .dropdown button:hover { background: #f1f5f9; }
 .dropdown .danger-item { color: #dc2626; }
 .dropdown .danger-item:hover { background: #fef2f2; }

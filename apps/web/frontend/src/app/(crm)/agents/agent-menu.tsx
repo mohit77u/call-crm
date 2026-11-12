@@ -21,6 +21,7 @@ export function AgentMenu({
   deviceId: number | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -44,13 +45,20 @@ export function AgentMenu({
         type="button"
         className="menu-btn"
         disabled={pending}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          const next = !open;
+          setOpen(next);
+          if (next) {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setDropUp(rect.bottom + 260 > window.innerHeight);
+          }
+        }}
         aria-label="Agent actions"
       >
         {pending ? "…" : "⋮"}
       </button>
       {open && (
-        <div className="dropdown">
+        <div className={`dropdown${dropUp ? " up" : ""}`}>
           <button type="button" onClick={() => run(() => setAgentActive(agentId, !active))}>
             {active ? "Disable agent" : "Enable agent"}
           </button>

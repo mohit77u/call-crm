@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import CallLog from './modules/call-log';
 import type { SimInfo, SimList } from './modules/call-log';
 import { heartbeat, login, verifyClient } from './src/api';
@@ -103,6 +104,7 @@ function CodeScreen({ onVerified }: { onVerified: (code: string, companyName: st
 function LoginScreen(props: { clientCode: string; companyName: string; onBack: () => void; onLoggedIn: (s: Session) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -132,7 +134,20 @@ function LoginScreen(props: { clientCode: string; companyName: string; onBack: (
       <Text style={styles.title}>{props.companyName}</Text>
       <Text style={styles.muted}>Client code: {props.clientCode}</Text>
       <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="Enter username" placeholderTextColor="#9ca3af" autoCapitalize="none" autoCorrect={false} />
-      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Enter password" placeholderTextColor="#9ca3af" secureTextEntry onSubmitEditing={submit} />
+      <View style={styles.passwordWrap}>
+        <TextInput
+          style={[styles.input, styles.passwordInput]}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Enter password"
+          placeholderTextColor="#9ca3af"
+          secureTextEntry={!showPassword}
+          onSubmitEditing={submit}
+        />
+        <Pressable onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn} hitSlop={8}>
+          <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#64748b" />
+        </Pressable>
+      </View>
       {!!error && <Text style={styles.error}>{error}</Text>}
       <Button title="Login" onPress={submit} busy={busy} />
       <Pressable onPress={props.onBack} style={{ marginTop: 16 }}>
@@ -248,7 +263,7 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Keep sync running</Text>
         <Text style={styles.muted}>
-          Calls are sent when you open the app and about every 15 minutes in the background. On Xiaomi, Vivo, Oppo, Realme and
+          Calls are sent when you open the app and about every 5 minutes in the background. On Xiaomi, Vivo, Oppo, Realme and
           Samsung phones, set Battery to “No restrictions” for this app so background sync is not stopped.
         </Text>
         <Pressable onPress={() => Linking.openSettings()} style={{ marginTop: 8 }}>
@@ -389,7 +404,10 @@ const styles = StyleSheet.create({
   home: { padding: 24, paddingTop: 64 },
   title: { fontSize: 24, fontWeight: '700', color: '#1c2333', marginBottom: 4 },
   muted: { color: '#6b7280' },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6eb', borderRadius: 8, padding: 12, fontSize: 16, marginTop: 12 },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6eb', borderRadius: 8, padding: 12, fontSize: 16, marginTop: 12, color: '#0f172a' },
+  passwordWrap: { position: 'relative', justifyContent: 'center' },
+  passwordInput: { paddingRight: 44 },
+  eyeBtn: { position: 'absolute', right: 12, padding: 4 },
   codeInput: { fontSize: 22, letterSpacing: 3, textAlign: 'center', marginTop: 20 },
   error: { color: '#c62828', marginTop: 10 },
   button: { backgroundColor: '#2556d9', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 16 },
