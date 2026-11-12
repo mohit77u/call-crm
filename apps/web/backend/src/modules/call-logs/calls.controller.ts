@@ -14,7 +14,9 @@ callsRouter.get(
   asyncHandler(async (req, res) => {
     const f = parseCallFilters(req.query as Record<string, unknown>);
     const page = callsService.parsePage(req.query as Record<string, unknown>);
-    res.json(await callsService.listCalls(req.admin!.companyId, f, page));
+    const rawLimit = Number((req.query as Record<string, unknown>).limit);
+    const perPage = Number.isFinite(rawLimit) ? Math.min(100, Math.max(5, Math.floor(rawLimit))) : 20;
+    res.json(await callsService.listCalls(req.admin!.companyId, f, page, perPage));
   }),
 );
 
