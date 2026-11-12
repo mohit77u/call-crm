@@ -2,9 +2,12 @@
   "name": "call-crm",
   "private": true,
   "scripts": {
-    "web": "npm run dev --prefix apps/web",
-    "web:build": "npm run build --prefix apps/web",
-    "web:start": "npm run start --prefix apps/web",
+    "web": "npm run dev --prefix apps/web/frontend",
+    "web:build": "npm run build --prefix apps/web/frontend",
+    "web:start": "npm run start --prefix apps/web/frontend",
+    "api": "npm run dev --prefix apps/web/backend",
+    "api:build": "npm run build --prefix apps/web/backend",
+    "api:start": "npm run start --prefix apps/web/backend",
     "mobile": "npm run start --prefix apps/mobile"
   }
 }

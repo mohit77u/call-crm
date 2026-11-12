@@ -12,7 +12,7 @@ TaskManager.defineTask(TASK, async () => {
 
 export async function startBackgroundSync() {
   if (!(await TaskManager.isTaskRegisteredAsync(TASK))) {
-    await BackgroundTask.registerTaskAsync(TASK, { minimumInterval: 15 });
+    await BackgroundTask.registerTaskAsync(TASK, { minimumInterval: 5 });
   }
 }
 

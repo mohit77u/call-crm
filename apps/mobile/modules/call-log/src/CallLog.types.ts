@@ -15,6 +15,12 @@ export type SimInfo = {
   iccId: string | null;
   label: string | null;
   number: string | null;
+  slotIndex: number;
+};
+
+export type SimList = {
+  sims: SimInfo[];
+  slotCount: number;
 };
 
 export type DeviceLocation = {

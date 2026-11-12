@@ -25,14 +25,20 @@ class CallLogModule : Module() {
       val context = appContext.reactContext ?: throw CodedException("React context is not available")
       val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
         ?: return@AsyncFunction emptyList<Map<String, Any?>>()
-      (sm.activeSubscriptionInfoList ?: emptyList()).map { info ->
-        mapOf(
-          "id" to info.subscriptionId,
-          "iccId" to info.iccId,
-          "label" to (info.carrierName ?: info.displayName)?.toString(),
-          "number" to info.number,
-        )
-      }
+      val infos = sm.activeSubscriptionInfoList ?: emptyList()
+      val slotCount = sm.activeSubscriptionInfoCountMax.coerceAtLeast(infos.size).coerceAtMost(2)
+      mapOf(
+        "sims" to infos.map { info ->
+          mapOf(
+            "id" to info.subscriptionId,
+            "iccId" to info.iccId,
+            "label" to (info.carrierName ?: info.displayName)?.toString(),
+            "number" to info.number,
+            "slotIndex" to info.simSlotIndex,
+          )
+        },
+        "slotCount" to slotCount,
+      )
     }
 
     AsyncFunction("getLastLocation") {

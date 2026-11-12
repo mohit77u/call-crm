@@ -42,4 +42,4 @@ export const login = (clientCode: string, username: string, password: string) =>
 export const uploadCalls = (token: string, calls: unknown[]) => request<{ saved: number }>('/api/app/calls', { calls }, token);
 
 export const heartbeat = (token: string, permissionsOk: boolean, location?: DeviceLocation | null) =>
-  request<{ ok: boolean }>('/api/app/heartbeat', { permissionsOk, appVersion, location: location ?? null }, token);
+  request<{ ok: boolean; syncRequestedAt?: string | null }>('/api/app/heartbeat', { permissionsOk, appVersion, location: location ?? null }, token);

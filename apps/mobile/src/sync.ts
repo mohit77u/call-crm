@@ -1,11 +1,13 @@
 import CallLog from '../modules/call-log';
 import type { SimInfo } from '../modules/call-log';
 import { ApiError, heartbeat, uploadCalls } from './api';
-import { clearSession, getSession, saveSession, setLastSyncAt, type Session } from './storage';
+import { clearSession, getSession, saveSession, setLastSyncAt, type SessionSim } from './storage';
 
 const BATCH = 200;
 
-export type SyncResult = { ok: true; uploaded: number } | { ok: false; reason: 'logged_out' | 'no_permission' | 'error'; message?: string };
+export type SyncResult =
+  | { ok: true; uploaded: number; requested?: boolean }
+  | { ok: false; reason: 'logged_out' | 'no_permission' | 'sim_unavailable' | 'error'; message?: string };
 
 let running: Promise<SyncResult> | null = null;
 
@@ -16,25 +18,44 @@ export function syncCalls(): Promise<SyncResult> {
   return running;
 }
 
-async function resolvePhoneAccountId(session: Session): Promise<string | null> {
-  if (!session.sim) return null;
-  const sims = await CallLog.listSims().catch(() => [] as SimInfo[]);
-  const match = sims.find((s) => s.iccId && s.iccId === session.sim!.iccId) ?? sims.find((s) => s.id === session.sim!.subId);
-  return match ? String(match.id) : null;
+async function resolveSelectedSim(sims: SimInfo[], sessionSim: SessionSim): Promise<SimInfo | null> {
+  return (
+    sims.find((s) => s.iccId && s.iccId === sessionSim.iccId) ??
+    sims.find((s) => s.id === sessionSim.subId && (sessionSim.slotIndex === undefined || s.slotIndex === sessionSim.slotIndex)) ??
+    null
+  );
 }
 
 async function doSync(): Promise<SyncResult> {
-  const session = await getSession();
+  let session = await getSession();
   if (!session) return { ok: false, reason: 'logged_out' };
   const permissionsOk = CallLog.hasPermission();
   try {
     const location = await CallLog.getLastLocation().catch(() => null);
-    await heartbeat(session.token, permissionsOk, location);
+    const hb = await heartbeat(session.token, permissionsOk, location);
+    // Admin "Sync now" from CRM → sync_requested_at on the device. If it's newer
+    // than what we've already seen, mark this run as admin-requested.
+    let requested = false;
+    const reqTs = hb.syncRequestedAt ? Date.parse(hb.syncRequestedAt) : 0;
+    if (reqTs > (session.syncReqSeen ?? 0)) {
+      session = { ...session, syncReqSeen: reqTs };
+      await saveSession(session);
+      requested = true;
+    }
     if (!permissionsOk) return { ok: false, reason: 'no_permission' };
-    if (!session.sim) return { ok: true, uploaded: 0 };
+    if (!session.sim && !session.simAll) return { ok: true, uploaded: 0 };
 
-    const phoneAccountId = await resolvePhoneAccountId(session);
-    if (!phoneAccountId) return { ok: false, reason: 'error', message: 'Selected SIM was not found on this phone' };
+    // simAll → sync call logs from every SIM (phoneAccountId = null).
+    // Each uploaded call still carries its own PHONE_ACCOUNT_ID in `sim`.
+    let phoneAccountId: string | null = null;
+    if (session.sim) {
+      const { sims } = await CallLog.listSims().catch(() => ({ sims: [], slotCount: 0 }));
+      const selectedSim = await resolveSelectedSim(sims, session.sim);
+      if (!selectedSim) {
+        return { ok: false, reason: 'sim_unavailable', message: 'Selected SIM is not active. Please select the correct work SIM.' };
+      }
+      phoneAccountId = String(selectedSim.id);
+    }
 
     let uploaded = 0;
     let since = session.syncFrom;
@@ -48,7 +69,7 @@ async function doSync(): Promise<SyncResult> {
       if (calls.length < BATCH) break;
     }
     await setLastSyncAt(Date.now());
-    return { ok: true, uploaded };
+    return { ok: true, uploaded, requested };
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
       await clearSession();

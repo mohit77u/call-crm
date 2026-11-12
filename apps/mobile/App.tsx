@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 
 import CallLog from './modules/call-log';
-import type { SimInfo } from './modules/call-log';
-import { login, verifyClient } from './src/api';
+import type { SimInfo, SimList } from './modules/call-log';
+import { heartbeat, login, verifyClient } from './src/api';
 import { startBackgroundSync, stopBackgroundSync } from './src/backgroundSync';
 import {
   type Session,
@@ -131,8 +131,8 @@ function LoginScreen(props: { clientCode: string; companyName: string; onBack: (
     <View style={styles.center}>
       <Text style={styles.title}>{props.companyName}</Text>
       <Text style={styles.muted}>Client code: {props.clientCode}</Text>
-      <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="Username" autoCapitalize="none" autoCorrect={false} />
-      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry onSubmitEditing={submit} />
+      <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="Enter username" placeholderTextColor="#9ca3af" autoCapitalize="none" autoCorrect={false} />
+      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Enter password" placeholderTextColor="#9ca3af" secureTextEntry onSubmitEditing={submit} />
       {!!error && <Text style={styles.error}>{error}</Text>}
       <Button title="Login" onPress={submit} busy={busy} />
       <Pressable onPress={props.onBack} style={{ marginTop: 16 }}>
@@ -144,7 +144,7 @@ function LoginScreen(props: { clientCode: string; companyName: string; onBack: (
 
 function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: () => void }) {
   const [sess, setSess] = useState(session);
-  const [pickingSim, setPickingSim] = useState(!session.sim);
+  const [pickingSim, setPickingSim] = useState(!session.sim && !session.simAll);
   const [hasPermission, setHasPermission] = useState(CallLog.hasPermission());
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [message, setMessage] = useState('');
@@ -160,10 +160,13 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
     const result = await syncCalls();
     setHasPermission(CallLog.hasPermission());
     setLastSyncAt(await getLastSyncAt());
-    if (result.ok) setMessage(result.uploaded ? `${result.uploaded} new calls sent` : 'Up to date');
+    if (result.ok) setMessage(result.requested ? 'Synced (requested by admin)' : result.uploaded ? `${result.uploaded} new calls sent` : 'Up to date');
     else if (result.reason === 'logged_out') onLoggedOut();
     else if (result.reason === 'no_permission') setMessage('Call log permission is needed');
-    else setMessage(result.message ?? 'Sync failed');
+    else if (result.reason === 'sim_unavailable') {
+      setMessage(result.message ?? 'Selected SIM is not active. Please select the correct work SIM.');
+      setPickingSim(true);
+    } else setMessage(result.message ?? 'Sync failed');
   }, [onLoggedOut]);
 
   const askPermission = async () => {
@@ -187,15 +190,34 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
     setBusy(false);
   };
 
+  // Lightweight poll: check for an admin "Sync now" request every 30s and run a
+  // full sync immediately when one is pending (instead of waiting for the 60s cycle).
+  const pollSyncRequest = useCallback(async () => {
+    const s = await getSession();
+    if (!s) return;
+    try {
+      const res = await heartbeat(s.token, CallLog.hasPermission(), null);
+      const ts = res.syncRequestedAt ? Date.parse(res.syncRequestedAt) : 0;
+      if (ts > (s.syncReqSeen ?? 0)) {
+        await saveSession({ ...s, syncReqSeen: ts });
+        sync();
+      }
+    } catch {
+      // network/server hiccup — next poll will retry
+    }
+  }, [sync]);
+
   useEffect(() => {
     startBackgroundSync().catch(() => {});
     const kickoff = CallLog.hasPermission() ? sync : askPermission;
     setTimeout(kickoff, 0);
     const sub = AppState.addEventListener('change', (state) => state === 'active' && sync());
     const timer = setInterval(sync, 60_000);
+    const pollTimer = setInterval(pollSyncRequest, 30_000);
     return () => {
       sub.remove();
       clearInterval(timer);
+      clearInterval(pollTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -211,7 +233,7 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
 
       <View style={styles.card}>
         <Row label="Call log permission" value={hasPermission ? 'Allowed' : 'Not allowed'} ok={hasPermission} />
-        <Row label="Work SIM" value={sess.sim?.label ?? 'Not selected'} ok={!!sess.sim} />
+        <Row label="Work SIM" value={sess.sim?.label ?? (sess.simAll ? 'All SIMs' : 'Not selected')} ok={!!sess.sim || !!sess.simAll} />
         <Row label="Last sync" value={lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'Not yet'} ok={!!lastSyncAt} />
         {!!message && <Text style={[styles.muted, { marginTop: 8 }]}>{message}</Text>}
       </View>
@@ -242,45 +264,104 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
 }
 
 function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone: (s: Session) => void }) {
-  const [sims, setSims] = useState<SimInfo[] | null>(null);
+  const [device, setDevice] = useState<SimList | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
+  const autoSaved = useRef(false);
 
-  useEffect(() => {
-    CallLog.listSims().then(setSims).catch(() => setSims([]));
+  const loadSims = useCallback(async () => {
+    setBusy(true);
+    setLoadError('');
+    try {
+      // SIM info needs READ_PHONE_STATE — request it here too, since the picker
+      // can mount before the home screen's permission flow finishes.
+      await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+        PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
+      ]);
+      const result = await CallLog.listSims();
+      setDevice(result);
+    } catch {
+      setDevice({ sims: [], slotCount: 0 });
+      setLoadError('Unable to read SIM information. Check phone permissions.');
+    } finally {
+      setBusy(false);
+    }
   }, []);
 
-  const choose = async (sim: SimInfo) => {
+  useEffect(() => {
+    loadSims();
+  }, [loadSims]);
+
+  const choose = useCallback(
+    async (sim: SimInfo) => {
+      setBusy(true);
+      const session = await getSession();
+      if (session) {
+        const updated: Session = {
+          ...session,
+          sim: { iccId: sim.iccId, label: sim.label ?? `SIM ${sim.id}`, subId: sim.id, slotIndex: sim.slotIndex },
+          simAll: false,
+        };
+        await saveSession(updated);
+        onDone(updated);
+      }
+      setBusy(false);
+    },
+    [onDone]
+  );
+
+  const chooseAll = useCallback(async () => {
     setBusy(true);
     const session = await getSession();
     if (session) {
-      const updated: Session = {
-        ...session,
-        sim: { iccId: sim.iccId, label: sim.label ?? `SIM ${sim.id}`, subId: sim.id },
-      };
+      const updated: Session = { ...session, sim: null, simAll: true };
       await saveSession(updated);
       onDone(updated);
     }
     setBusy(false);
-  };
+  }, [onDone]);
+
+  useEffect(() => {
+    if (!device || autoSaved.current) return;
+    const sims = device.sims;
+    if (device.slotCount === 1 && sims.length === 1) {
+      autoSaved.current = true;
+      choose(sims[0]);
+    }
+  }, [device, choose]);
+
+  const sims = device?.sims ?? [];
 
   return (
     <ScrollView contentContainerStyle={styles.center}>
       <Text style={styles.title}>Select work SIM</Text>
       <Text style={styles.muted}>
-        {agentPhone
-          ? `Choose the SIM that has number ${agentPhone}. Only calls on this SIM will be sent to the CRM.`
-          : 'Choose the SIM used for work calls. Only calls on this SIM will be sent to the CRM.'}
+        Choose the SIM used for work calls — only calls on this SIM will be sent to the CRM.
+        On a single-SIM phone the inserted SIM is selected automatically.
       </Text>
-      {sims === null && <ActivityIndicator style={{ marginTop: 24 }} />}
-      {sims?.map((s, i) => (
+      {busy && device === null && <ActivityIndicator style={{ marginTop: 24 }} />}
+      {loadError ? <Text style={styles.error}>{loadError}</Text> : null}
+      {device?.slotCount === 1 && sims.length === 1 ? (
+        <Text style={[styles.muted, { marginTop: 16 }]}>Single-SIM phone detected. The inserted SIM will be selected automatically.</Text>
+      ) : null}
+      {sims.map((s, i) => (
         <Button
-          key={s.id}
+          key={`${s.slotIndex}-${s.id}`}
           title={`${s.label ?? `SIM ${i + 1}`}${s.number ? ` · ${s.number}` : ''}`}
           onPress={() => choose(s)}
           busy={busy}
         />
       ))}
-      {sims?.length === 0 && <Text style={[styles.muted, { marginTop: 16 }]}>No SIM found. Check that a SIM is inserted.</Text>}
+      {device && sims.length === 0 && !loadError && (
+        <Text style={[styles.muted, { marginTop: 16 }]}>No active SIM detected. Check that a SIM is inserted and enabled.</Text>
+      )}
+      {!!loadError && <Button title="Retry" onPress={loadSims} busy={busy} />}
+      {!loadError && device && sims.length === 0 && <Button title="Refresh" onPress={loadSims} busy={busy} />}
+      <Button title="Sync calls from all SIMs" onPress={chooseAll} busy={busy} />
+      <Text style={[styles.muted, { marginTop: 8, fontSize: 12, textAlign: 'center' }]}>
+        Use this if you only have one work SIM or want every call synced regardless of SIM.
+      </Text>
     </ScrollView>
   );
 }
