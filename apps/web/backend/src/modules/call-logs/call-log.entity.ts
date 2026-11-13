@@ -38,6 +38,9 @@ export class CallLog {
   @Column({ type: "varchar", nullable: true })
   sim: string | null;
 
+  @Column({ name: "sim_details", type: "jsonb", nullable: true })
+  simDetails: Record<string, unknown> | null;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 }

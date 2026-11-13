@@ -17,6 +17,7 @@ type IncomingCall = {
   timestamp?: unknown;
   durationSec?: unknown;
   sim?: unknown;
+  simDetails?: unknown;
 };
 
 export async function verifyClient(clientCode: unknown) {
@@ -80,10 +81,10 @@ export async function uploadCalls(session: AppContext, calls: IncomingCall[]) {
     const type: CallType = CALL_TYPES.includes(c.type as CallType) ? (c.type as CallType) : "unknown";
     const duration = Math.max(0, Math.floor(Number(c.durationSec) || 0));
     const rows = await AppDataSource.query(
-      `INSERT INTO call_logs (company_id, agent_id, device_id, local_id, phone_number, contact_name, call_type, status, started_at, duration_sec, sim)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, to_timestamp($9 / 1000.0), $10, $11)
+      `INSERT INTO call_logs (company_id, agent_id, device_id, local_id, phone_number, contact_name, call_type, status, started_at, duration_sec, sim, sim_details)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, to_timestamp($9 / 1000.0), $10, $11, $12::jsonb)
        ON CONFLICT (device_id, local_id) DO UPDATE
-         SET duration_sec = EXCLUDED.duration_sec, status = EXCLUDED.status, call_type = EXCLUDED.call_type, contact_name = EXCLUDED.contact_name
+         SET duration_sec = EXCLUDED.duration_sec, status = EXCLUDED.status, call_type = EXCLUDED.call_type, contact_name = EXCLUDED.contact_name, sim_details = EXCLUDED.sim_details
        RETURNING id`,
       [
         session.companyId,
@@ -97,6 +98,7 @@ export async function uploadCalls(session: AppContext, calls: IncomingCall[]) {
         timestamp,
         duration,
         c.sim ? String(c.sim).slice(0, 100) : null,
+        c.simDetails ? JSON.stringify(c.simDetails).slice(0, 4000) : null,
       ],
     );
     saved += rows.length;

@@ -175,7 +175,16 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
     const result = await syncCalls();
     setHasPermission(CallLog.hasPermission());
     setLastSyncAt(await getLastSyncAt());
-    if (result.ok) setMessage(result.requested ? 'Synced (requested by admin)' : result.uploaded ? `${result.uploaded} new calls sent` : 'Up to date');
+    if (result.ok)
+      setMessage(
+        result.requested
+          ? 'Synced (requested by admin)'
+          : result.uploaded
+            ? `${result.uploaded} new calls sent`
+            : result.skipped
+              ? 'No new calls on the selected SIM'
+              : 'Up to date'
+      );
     else if (result.reason === 'logged_out') onLoggedOut();
     else if (result.reason === 'no_permission') setMessage('Call log permission is needed');
     else if (result.reason === 'sim_unavailable') {

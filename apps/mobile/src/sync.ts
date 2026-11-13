@@ -1,5 +1,5 @@
 import CallLog from '../modules/call-log';
-import type { SimInfo } from '../modules/call-log';
+import type { DeviceCall, SimInfo } from '../modules/call-log';
 import { ApiError, heartbeat, uploadCalls } from './api';
 import { clearSession, getSession, saveSession, setLastSyncAt, type SessionSim } from './storage';
 
@@ -22,7 +22,7 @@ function istWorkWindowMs(): { startMs: number; endMs: number } {
 }
 
 export type SyncResult =
-  | { ok: true; uploaded: number; requested?: boolean }
+  | { ok: true; uploaded: number; requested?: boolean; skipped?: number }
   | { ok: false; reason: 'logged_out' | 'no_permission' | 'sim_unavailable' | 'error'; message?: string };
 
 let running: Promise<SyncResult> | null = null;
@@ -40,6 +40,47 @@ async function resolveSelectedSim(sims: SimInfo[], sessionSim: SessionSim): Prom
     sims.find((s) => s.id === sessionSim.subId && (sessionSim.slotIndex === undefined || s.slotIndex === sessionSim.slotIndex)) ??
     null
   );
+}
+
+// Every identifier the call log's PHONE_ACCOUNT_ID might contain for this SIM:
+// subscription id, ICCID, and any telecom phone-account ids resolved natively.
+function simIdentifiers(sim: SimInfo): Set<string> {
+  const ids = new Set<string>([String(sim.id)]);
+  if (sim.iccId) ids.add(sim.iccId);
+  for (const a of sim.accountIds ?? []) ids.add(a);
+  return ids;
+}
+
+// Resolve which SIM a call belongs to. PHONE_ACCOUNT_ID format varies by OEM
+// and Android version: subscription id (Android 13+), ICCID (Android 12-),
+// ICCID embedded with extra chars (some Samsung), SIM slot index (some OEMs),
+// or null. Matching tiers: exact id → long-id substring → slot index →
+// single-SIM fallback.
+function findSimForCall(simsWithIds: { sim: SimInfo; ids: Set<string> }[], call: DeviceCall): SimInfo | null {
+  const v = call.sim?.trim();
+  if (!v) return simsWithIds.length === 1 ? simsWithIds[0].sim : null;
+  const exact = simsWithIds.find((x) => x.ids.has(v));
+  if (exact) return exact.sim;
+  // ICCID can appear inside PHONE_ACCOUNT_ID with extra characters — only allow
+  // substring matching for long identifiers so short subscription ids can't
+  // cause false positives.
+  const embedded = simsWithIds.find((x) =>
+    [...x.ids].some((id) => id.length >= 10 && (v.includes(id) || (v.length >= 10 && id.includes(v))))
+  );
+  if (embedded) return embedded.sim;
+  const bySlot = simsWithIds.find((x) => String(x.sim.slotIndex) === v);
+  return bySlot?.sim ?? (simsWithIds.length === 1 ? simsWithIds[0].sim : null);
+}
+
+function simDetailsOf(sim: SimInfo): Record<string, unknown> {
+  return {
+    subId: sim.id,
+    iccId: sim.iccId,
+    phoneAccountIds: sim.accountIds ?? [],
+    slotIndex: sim.slotIndex,
+    label: sim.label,
+    number: sim.number,
+  };
 }
 
 async function doSync(): Promise<SyncResult> {
@@ -62,26 +103,32 @@ async function doSync(): Promise<SyncResult> {
     if (!session.sim && !session.simAll) return { ok: true, uploaded: 0 };
 
     // simAll → sync call logs from every SIM (no SIM filter).
-    // Each uploaded call still carries its own PHONE_ACCOUNT_ID in `sim`.
-    // PHONE_ACCOUNT_ID holds the ICCID on some devices and the subscription id
-    // on others, so pass both identifiers for filtering.
-    let simFilter: { id: string; iccId: string | null } | null = null;
+    // With a selected SIM we fetch all calls and attribute each one in JS —
+    // PHONE_ACCOUNT_ID is unreliable across OEMs, so SQL-side filtering missed
+    // calls on devices (e.g. Xiaomi) that store a different identifier or null.
+    const { sims } = await CallLog.listSims().catch(() => ({ sims: [] as SimInfo[], slotCount: 0 }));
+    const simsWithIds = sims.map((s) => ({ sim: s, ids: simIdentifiers(s) }));
+    let selectedSim: SimInfo | null = null;
     if (session.sim) {
-      const { sims } = await CallLog.listSims().catch(() => ({ sims: [], slotCount: 0 }));
-      const selectedSim = await resolveSelectedSim(sims, session.sim);
+      selectedSim = await resolveSelectedSim(sims, session.sim);
       if (!selectedSim) {
         return { ok: false, reason: 'sim_unavailable', message: 'Selected SIM is not active. Please select the correct work SIM.' };
       }
-      simFilter = { id: String(selectedSim.id), iccId: selectedSim.iccId ?? null };
     }
 
     let uploaded = 0;
+    let skipped = 0;
     let since = session.syncFrom;
     const { startMs, endMs } = istWorkWindowMs();
     for (;;) {
-      const calls = await CallLog.getCallsSince(since, BATCH, simFilter?.id ?? null, simFilter?.iccId ?? null);
+      const calls = await CallLog.getCallsSince(since, BATCH);
       if (calls.length === 0) break;
-      const inWindow = calls.filter((c) => c.timestamp >= startMs && c.timestamp < endMs);
+      const resolved = calls.map((c) => ({ call: c, sim: findSimForCall(simsWithIds, c) }));
+      const matched = selectedSim ? resolved.filter((r) => r.sim === selectedSim) : resolved;
+      skipped += calls.length - matched.length;
+      const inWindow = matched
+        .filter((r) => r.call.timestamp >= startMs && r.call.timestamp < endMs)
+        .map((r) => ({ ...r.call, simDetails: r.sim ? simDetailsOf(r.sim) : null }));
       if (inWindow.length > 0) await uploadCalls(session.token, inWindow);
       uploaded += inWindow.length;
       since = calls[calls.length - 1].timestamp;
@@ -89,7 +136,7 @@ async function doSync(): Promise<SyncResult> {
       if (calls.length < BATCH) break;
     }
     await setLastSyncAt(Date.now());
-    return { ok: true, uploaded, requested };
+    return { ok: true, uploaded, requested, skipped };
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
       await clearSession();

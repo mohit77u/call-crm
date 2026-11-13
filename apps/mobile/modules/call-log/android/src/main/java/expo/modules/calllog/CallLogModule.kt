@@ -6,7 +6,11 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.provider.CallLog
+import android.os.Build
+import android.telecom.PhoneAccountHandle
+import android.telecom.TelecomManager
 import android.telephony.SubscriptionManager
+import android.telephony.TelephonyManager
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -27,14 +31,33 @@ class CallLogModule : Module() {
         ?: return@AsyncFunction emptyList<Map<String, Any?>>()
       val infos = sm.activeSubscriptionInfoList ?: emptyList()
       val slotCount = sm.activeSubscriptionInfoCountMax.coerceAtLeast(infos.size).coerceAtMost(2)
+      // CallLog.Calls.PHONE_ACCOUNT_ID stores the telecom phone-account id, which
+      // is the subscription id on most devices but the ICCID (or another value)
+      // on some OEM builds — collect every identifier that maps to each SIM.
+      val phoneAccounts: List<PhoneAccountHandle> = try {
+        val tm = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+        tm?.callCapablePhoneAccounts ?: emptyList()
+      } catch (e: Exception) {
+        emptyList()
+      }
       mapOf(
         "sims" to infos.map { info ->
+          // SubscriptionInfo.getIccId() is hidden on Android 10+ unless the app
+          // has carrier privileges — on devices like Xiaomi it returns null even
+          // though the call log stores the ICCID in PHONE_ACCOUNT_ID. Fall back
+          // to TelephonyManager.getSimSerialNumber(), which only needs
+          // READ_PHONE_STATE.
+          val iccId = info.iccId?.takeIf { it.isNotBlank() } ?: simIccId(context, info.subscriptionId)
+          val accountIds = phoneAccounts
+            .filter { it.id == info.subscriptionId.toString() || (iccId != null && it.id == iccId) }
+            .map { it.id }
           mapOf(
             "id" to info.subscriptionId,
-            "iccId" to info.iccId,
+            "iccId" to iccId,
             "label" to (info.carrierName ?: info.displayName)?.toString(),
             "number" to info.number,
             "slotIndex" to info.simSlotIndex,
+            "accountIds" to accountIds,
           )
         },
         "slotCount" to slotCount,
@@ -66,7 +89,10 @@ class CallLogModule : Module() {
       }
     }
 
-    AsyncFunction("getCallsSince") { sinceMs: Double, limit: Int, phoneAccountId: String?, iccId: String? ->
+    // Returns every call after sinceMs — SIM attribution is done in JS because
+    // PHONE_ACCOUNT_ID is unreliable across OEMs (null, ICCID, subscription id,
+    // or phone-account id depending on the device).
+    AsyncFunction("getCallsSince") { sinceMs: Double, limit: Int ->
       if (!hasPermission()) throw CallLogPermissionException()
       val context = appContext.reactContext ?: throw CodedException("React context is not available")
       val projection = arrayOf(
@@ -78,21 +104,8 @@ class CallLogModule : Module() {
         CallLog.Calls.DURATION,
         CallLog.Calls.PHONE_ACCOUNT_ID,
       )
-      // PHONE_ACCOUNT_ID stores the ICCID on some devices and the subscription
-      // id on others — match either so SIM filtering works everywhere.
-      val selection = when {
-        phoneAccountId != null && iccId != null ->
-          "${CallLog.Calls.DATE} > ? AND ${CallLog.Calls.PHONE_ACCOUNT_ID} IN (?, ?)"
-        phoneAccountId != null ->
-          "${CallLog.Calls.DATE} > ? AND ${CallLog.Calls.PHONE_ACCOUNT_ID} = ?"
-        else -> "${CallLog.Calls.DATE} > ?"
-      }
-      val selectionArgs = when {
-        phoneAccountId != null && iccId != null ->
-          arrayOf(sinceMs.toLong().toString(), phoneAccountId, iccId)
-        phoneAccountId != null -> arrayOf(sinceMs.toLong().toString(), phoneAccountId)
-        else -> arrayOf(sinceMs.toLong().toString())
-      }
+      val selection = "${CallLog.Calls.DATE} > ?"
+      val selectionArgs = arrayOf(sinceMs.toLong().toString())
       val calls = mutableListOf<Map<String, Any?>>()
       context.contentResolver.query(
         CallLog.Calls.CONTENT_URI,
@@ -123,6 +136,16 @@ class CallLogModule : Module() {
         }
       }
       calls
+    }
+  }
+
+  private fun simIccId(context: Context, subId: Int): String? {
+    return try {
+      val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager ?: return null
+      val tel = if (Build.VERSION.SDK_INT >= 29 && subId >= 0) tm.createForSubscriptionId(subId) else tm
+      tel.simSerialNumber?.takeIf { it.isNotBlank() }
+    } catch (e: Exception) {
+      null
     }
   }
 

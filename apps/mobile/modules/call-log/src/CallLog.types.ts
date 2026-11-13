@@ -16,6 +16,7 @@ export type SimInfo = {
   label: string | null;
   number: string | null;
   slotIndex: number;
+  accountIds?: string[];
 };
 
 export type SimList = {
