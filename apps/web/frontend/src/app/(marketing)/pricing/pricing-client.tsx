@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PLANS, inr, type PlanDef } from "@/lib/plans";
 import { FEATURE_DEFS, LIMIT_DEFS, type FeatureKey, type LimitKey } from "@/lib/features";
+import { setNavState } from "@/lib/nav-state";
 
 function Check({ ok }: { ok: boolean }) {
   return ok ? <span className="cmp-yes">✓</span> : <span className="cmp-no">—</span>;
 }
 
 function PlanCard({ plan, yearly }: { plan: PlanDef; yearly: boolean }) {
+  const router = useRouter();
   const price = yearly ? plan.priceYearly : plan.priceMonthly;
   const perMonth = yearly ? Math.round(plan.priceYearly / 12) : plan.priceMonthly;
   return (
@@ -28,9 +31,18 @@ function PlanCard({ plan, yearly }: { plan: PlanDef; yearly: boolean }) {
           <li key={h}><span className="cmp-yes">✓</span> {h}</li>
         ))}
       </ul>
-      <Link className={`btn${plan.slug === "pro" ? "" : " secondary"}`} href={`/contact?plan=${plan.slug}`} style={{ width: "100%", textAlign: "center" }}>
+      <a
+        className={`btn${plan.slug === "pro" ? "" : " secondary"}`}
+        href="/contact"
+        style={{ width: "100%", textAlign: "center" }}
+        onClick={(e) => {
+          e.preventDefault();
+          setNavState("crm:contact:plan", plan.slug);
+          router.push("/contact");
+        }}
+      >
         Get {plan.name}
-      </Link>
+      </a>
     </div>
   );
 }

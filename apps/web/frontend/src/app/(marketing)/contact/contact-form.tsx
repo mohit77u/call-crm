@@ -1,13 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { submitEnquiry } from "./actions";
 import { PLANS } from "@/lib/plans";
 import { notify } from "@/lib/notify";
+import { takeNavState } from "@/lib/nav-state";
 
 export function ContactForm({ selectedPlan }: { selectedPlan: string }) {
   const [pending, startTransition] = useTransition();
   const [sent, setSent] = useState(false);
+  const [plan, setPlan] = useState(selectedPlan);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const saved = takeNavState<string>("crm:contact:plan");
+      if (saved) setPlan(saved);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <form
@@ -32,7 +42,7 @@ export function ContactForm({ selectedPlan }: { selectedPlan: string }) {
       <label>Email<input name="email" type="email" required /></label>
       <label>Company (optional)<input name="company" /></label>
       <label>Plan
-        <select name="plan" defaultValue={selectedPlan}>
+        <select name="plan" value={plan} onChange={(e) => setPlan(e.target.value)}>
           <option value="">Not sure yet</option>
           {PLANS.map((p) => (
             <option key={p.slug} value={p.slug}>{p.name} — up to {p.maxAgents} agents</option>

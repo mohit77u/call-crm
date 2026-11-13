@@ -1,8 +1,10 @@
-import Link from "next/link";
+import { cookies } from "next/headers";
 import { requireAdmin, getAdminToken, hasFeature } from "@/lib/auth";
 import { apiFetch, ApiError } from "@/lib/api";
 import { formatDateTime, formatMinutes, todayInZone } from "@/lib/calls";
 import { CallsBarChart, StatusDonut } from "./charts";
+import { PeriodPills } from "./period-pills";
+import { AgentCallsLink } from "./agent-calls-link";
 
 export const metadata = { title: "Dashboard" };
 
@@ -24,10 +26,11 @@ function trend(cur: number, prev: number) {
   return { text: `${pct > 0 ? "+" : ""}${pct}%`, up: pct >= 0 };
 }
 
-export default async function Dashboard({ searchParams }: PageProps<"/company/dashboard">) {
+export default async function Dashboard() {
   const admin = await requireAdmin();
-  const sp = await searchParams;
-  const days = DAY_OPTIONS.includes(Number(sp.days)) ? Number(sp.days) : 7;
+  const store = await cookies();
+  const daysParam = Number(store.get("crm_dashboard_days")?.value);
+  const days = DAY_OPTIONS.includes(daysParam) ? daysParam : 7;
   const to = todayInZone();
   const from = addDays(to, -(days - 1));
   const canExport = hasFeature(admin, "exports");
@@ -85,11 +88,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/company/da
           <p className="page-sub">{from} → {to} · compared with previous {days} days</p>
         </div>
         <div className="page-actions">
-          <div className="period-pills">
-            {DAY_OPTIONS.map((d) => (
-              <Link key={d} href={`/company/dashboard?days=${d}`} className={`pill${d === days ? " active" : ""}`}>{d}d</Link>
-            ))}
-          </div>
+          <PeriodPills days={days} />
           {canExport && <a className="btn secondary" href={`/api/calls/export?from=${from}&to=${to}`}>Export CSV</a>}
         </div>
       </div>
@@ -124,7 +123,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/company/da
           <tbody>
             {data.agents.map((a) => (
               <tr key={a.id}>
-                <td><a href={`/company/calls?agent=${a.id}&from=${from}&to=${to}`}>{a.name}</a></td>
+                <td><AgentCallsLink agentId={a.id} name={a.name} from={from} to={to} /></td>
                 <td>{a.total}</td><td>{a.connected}</td><td>{a.not_connected}</td><td>{a.received}</td><td>{a.missed}</td>
                 <td>{formatMinutes(a.talk_sec)}</td>
                 <td className="muted">{a.last_sync_at ? formatDateTime(a.last_sync_at) : "Never"}</td>

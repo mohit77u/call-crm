@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { formatDateTime } from "@/lib/calls";
 import { SearchInput } from "@/components/search-input";
 import { DataTable } from "@/components/data-table";
+import { takeNavState } from "@/lib/nav-state";
 
 export type AgentRow = {
   id: number;
@@ -18,9 +19,17 @@ export type AgentRow = {
   last_sync_at: string | null;
 };
 
-export function AgentsBrowser({ agents, companies, initialCompany }: { agents: AgentRow[]; companies: { id: number; name: string }[]; initialCompany?: string }) {
+export function AgentsBrowser({ agents, companies }: { agents: AgentRow[]; companies: { id: number; name: string }[] }) {
   const [q, setQ] = useState("");
-  const [company, setCompany] = useState(initialCompany ?? "");
+  const [company, setCompany] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const saved = takeNavState<string>("crm:admin:agents:company");
+      if (saved && /^\d+$/.test(saved)) setCompany(saved);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

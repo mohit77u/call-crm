@@ -5,6 +5,7 @@ import { STATUSES, STATUS_LABELS, formatDateTime, formatDuration, todayInZone, t
 import { Pagination } from "@/components/pagination";
 import { SearchInput } from "@/components/search-input";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
+import { takeNavState } from "@/lib/nav-state";
 
 type CallRow = { id: string; agent: string; phone_number: string; contact_name: string | null; call_type: string; status: CallStatus; started_at: string; duration_sec: number };
 type CallsResponse = { agents: { id: number; name: string }[]; summary: { total: number; talkSec: number }; calls: CallRow[]; page: number; perPage: number; pages: number };
@@ -53,8 +54,8 @@ function statusPill(status: CallStatus) {
   return <span className={`tpill ${STATUS_CLS[status] ?? "st-other"}`}>{STATUS_LABELS[status]}</span>;
 }
 
-export function CallsBrowser({ canExport, initialFilters }: { canExport: boolean; initialFilters?: Partial<Filters> }) {
-  const [filters, setFilters] = useState<Filters>(() => ({ ...defaultFilters(), ...(initialFilters ?? {}) }));
+export function CallsBrowser({ canExport }: { canExport: boolean }) {
+  const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [draft, setDraft] = useState<Filters>(filters);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
@@ -62,6 +63,23 @@ export function CallsBrowser({ canExport, initialFilters }: { canExport: boolean
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const saved = takeNavState<Partial<Filters>>("crm:company:calls:filters");
+      if (!saved) return;
+      const next = defaultFilters();
+      if (saved.from && /^\d{4}-\d{2}-\d{2}$/.test(saved.from)) next.from = saved.from;
+      if (saved.to && /^\d{4}-\d{2}-\d{2}$/.test(saved.to)) next.to = saved.to;
+      if (saved.agent && /^\d+$/.test(saved.agent)) next.agent = saved.agent;
+      if (saved.status && (STATUSES as readonly string[]).includes(saved.status)) next.status = saved.status;
+      if (typeof saved.q === "string") next.q = saved.q.slice(0, 100);
+      setFilters(next);
+      setDraft(next);
+      setPage(1);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,7 +167,7 @@ export function CallsBrowser({ canExport, initialFilters }: { canExport: boolean
         emptyMessage="No calls for these filters."
         rowKey={(c) => c.id}
         rows={data?.calls ?? []}
-        footer={data ? (
+        footer={data && data.pages > 1 ? (
           <Pagination
             page={data.page}
             pages={data.pages}

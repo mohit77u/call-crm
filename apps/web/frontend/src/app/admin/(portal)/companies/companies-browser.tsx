@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { SearchInput } from "@/components/search-input";
 import { formatDateTime } from "@/lib/calls";
 import { planDisplayName } from "@/lib/plans";
+import { setNavState } from "@/lib/nav-state";
 import { deleteCompany } from "./actions";
 import { RowActionsMenu } from "@/components/row-actions-menu";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
@@ -21,6 +23,7 @@ export type CompanyRow = {
 };
 
 export function CompaniesBrowser({ companies }: { companies: CompanyRow[] }) {
+  const router = useRouter();
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
@@ -50,8 +53,12 @@ export function CompaniesBrowser({ companies }: { companies: CompanyRow[] }) {
             { header: "Plan", cell: (c) => <span className="badge other">{planDisplayName(c.plan)}</span> },
             { header: "Client Code", cell: (c) => <span className="muted">{c.client_code}</span> },
             { header: "Admin Email", cell: (c) => c.admin_email ?? "-" },
-            { header: "Agents", cell: (c) => <Link href={`/admin/agents?company=${c.id}`}>{c.agents}</Link> },
-            { header: "Calls", cell: (c) => <Link href={`/admin/calls?company=${c.id}`}>{c.calls}</Link> },
+            { header: "Agents", cell: (c) => (
+              <a href="/admin/agents" onClick={(e) => { e.preventDefault(); setNavState("crm:admin:agents:company", String(c.id)); router.push("/admin/agents"); }}>{c.agents}</a>
+            ) },
+            { header: "Calls", cell: (c) => (
+              <a href="/admin/calls" onClick={(e) => { e.preventDefault(); setNavState("crm:admin:calls:filters", { company: String(c.id) }); router.push("/admin/calls"); }}>{c.calls}</a>
+            ) },
             { header: "Created", cell: (c) => <span className="muted">{formatDateTime(c.created_at)}</span> },
             {
               header: "Actions",
