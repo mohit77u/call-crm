@@ -42,7 +42,7 @@ export function Pagination({ page, pages, total, perPage, onPage, onPerPageChang
               <select
                 value={perPage}
                 onChange={(e) => onPerPageChange(Number(e.target.value))}
-                className="h-8 appearance-none rounded-md border border-slate-300 bg-white pl-2.5 pr-8 text-[13px] leading-8 text-slate-700 focus:border-[var(--primary)] focus:outline-none"
+                className="h-8 appearance-none rounded-md border border-slate-300 bg-white py-0 pl-2.5 pr-8 text-[13px] leading-8 text-slate-700 focus:border-[var(--primary)] focus:outline-none"
               >
                 {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
@@ -50,15 +50,13 @@ export function Pagination({ page, pages, total, perPage, onPage, onPerPageChang
             </span>
           </label>
         )}
-        {pages > 1 && (
-          <div className="flex items-center gap-1">
-            <button type="button" className={`${btnBase} ${btnIdle} disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)}>← Prev</button>
-            {pageWindow(page, pages).map((n) => (
-              <button key={n} type="button" className={`${btnBase} ${n === page ? btnActive : btnIdle}`} onClick={() => onPage(n)}>{n}</button>
-            ))}
-            <button type="button" className={`${btnBase} ${btnIdle} disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)}>Next →</button>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          <button type="button" className={`${btnBase} ${btnIdle} disabled:opacity-40`} disabled={page <= 1} onClick={() => onPage(page - 1)}>← Prev</button>
+          {pageWindow(page, pages).map((n) => (
+            <button key={n} type="button" className={`${btnBase} ${n === page ? btnActive : btnIdle}`} onClick={() => onPage(n)}>{n}</button>
+          ))}
+          <button type="button" className={`${btnBase} ${btnIdle} disabled:opacity-40`} disabled={page >= pages} onClick={() => onPage(page + 1)}>Next →</button>
+        </div>
       </div>
     </div>
   );

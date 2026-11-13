@@ -166,7 +166,7 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
         emptyMessage="No calls for these filters."
         rowKey={(c) => c.id}
         rows={data?.calls ?? []}
-        footer={data && data.pages > 1 ? (
+        footer={data && data.summary.total >= 10 ? (
           <Pagination
             page={data.page}
             pages={data.pages}
