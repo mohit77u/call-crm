@@ -1,26 +1,17 @@
 import Image from "next/image";
-import Link from "next/link";
 import { login } from "../actions";
+import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata = { title: "Login" };
 
-
-export default async function LoginPage({ searchParams }: PageProps<"/company/login">) {
-  const { error, reset } = await searchParams;
+export default function LoginPage() {
   return (
-    <div className="auth">
-      <div className="card">
-        <Image src="/logo.png" className="auth-logo" width={64} height={64} alt="Call CRM" />
-        <h1>Call CRM</h1>
-        <p className="subtitle">Sign in to your company dashboard</p>
-        <form action={login} className="form">
-          {error && <div className="error">{error}</div>}
-          {reset && <div className="notice">Password updated. You can log in now.</div>}
-          <label>Email<input name="email" type="email" required autoFocus /></label>
-          <label>Password<input name="password" type="password" required /></label>
-          <button type="submit">Login</button>
-          <p className="muted"><Link href="/company/forgot-password">Forgot password?</Link></p>
-        </form>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-5">
+      <div className="w-[400px] rounded-2xl bg-white p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+        <Image src="/logo.png" className="mx-auto mb-3.5 block h-16 w-16 rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.25)]" width={64} height={64} alt="Call CRM" />
+        <h1 className="mb-1 text-center text-[22px] font-bold text-slate-900">Call CRM</h1>
+        <p className="mb-[22px] text-center text-[13px] text-slate-500">Sign in to your company dashboard</p>
+        <LoginForm action={login} forgotHref="/company/forgot-password" />
       </div>
     </div>
   );

@@ -38,7 +38,7 @@ export default async function CompanyDetailPage({ params, searchParams }: PagePr
 
   return (
     <>
-      <p><Link href="/admin">&larr; Companies</Link></p>
+      <p><Link href="/admin/companies">&larr; Companies</Link></p>
       <h1>{company.name} <span className="badge other" style={{ verticalAlign: "middle" }}>{planDisplayName(company.plan)}</span></h1>
       {created && (
         <div className="notice">

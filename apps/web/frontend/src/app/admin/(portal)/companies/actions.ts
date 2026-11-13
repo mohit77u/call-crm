@@ -5,25 +5,21 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { getPlatformToken, requireSuperadmin } from "@/lib/auth";
 import { FEATURE_DEFS, type FeatureKey } from "@/lib/features";
 
-function back(message: string, isError = true): never {
-  redirect(`/admin/companies/new?${isError ? "error" : "notice"}=${encodeURIComponent(message)}`);
-}
+export type CompanyFormState = { error?: string; companyId?: number };
 
-export async function createCompany(form: FormData) {
+export async function createCompany(_prev: CompanyFormState, form: FormData): Promise<CompanyFormState> {
   await requireSuperadmin();
   const name = String(form.get("name") ?? "").trim();
   const adminName = String(form.get("adminName") ?? "").trim();
   const adminEmail = String(form.get("adminEmail") ?? "").trim().toLowerCase();
   const adminPassword = String(form.get("adminPassword") ?? "");
-  if (!name || !adminName || !adminEmail) back("Company name, admin name and email are required");
-  if (adminPassword.length < 8) back("Admin password must be at least 8 characters");
 
   const features: Record<string, boolean | number | null> = {};
   for (const key of Object.keys(FEATURE_DEFS) as FeatureKey[]) {
     features[key] = form.get(`feature_${key}`) === "on";
   }
   const maxAgentsRaw = String(form.get("maxAgents") ?? "").trim();
-  features.maxAgents = maxAgentsRaw === "" ? null : Math.max(0, Math.floor(Number(maxAgentsRaw) || 0));
+  features.maxAgents = maxAgentsRaw === "" ? 150 : Math.min(150, Math.max(0, Math.floor(Number(maxAgentsRaw) || 0)));
 
   try {
     const res = await apiFetch<{ company: { id: number } }>("/api/admin/companies", {
@@ -37,9 +33,9 @@ export async function createCompany(form: FormData) {
       },
       token: await getPlatformToken(),
     });
-    redirect(`/admin/companies/${res.company.id}?created=1`);
+    return { companyId: res.company.id };
   } catch (e) {
-    back(e instanceof ApiError ? e.message : "Could not create company");
+    return { error: e instanceof ApiError ? e.message : "Could not create company" };
   }
 }
 
@@ -51,7 +47,7 @@ export async function updateCompany(id: number, form: FormData) {
     features[key] = form.get(`feature_${key}`) === "on";
   }
   const maxAgentsRaw = String(form.get("maxAgents") ?? "").trim();
-  features.maxAgents = maxAgentsRaw === "" ? null : Math.max(0, Math.floor(Number(maxAgentsRaw) || 0));
+  features.maxAgents = maxAgentsRaw === "" ? 150 : Math.min(150, Math.max(0, Math.floor(Number(maxAgentsRaw) || 0)));
 
   try {
     await apiFetch(`/api/admin/companies/${id}`, {
@@ -65,14 +61,14 @@ export async function updateCompany(id: number, form: FormData) {
   redirect(`/admin/companies/${id}?notice=Saved`);
 }
 
-export async function deleteCompany(id: number) {
+export async function deleteCompany(id: number): Promise<{ error?: string }> {
   await requireSuperadmin();
   try {
     await apiFetch(`/api/admin/companies/${id}`, { method: "DELETE", token: await getPlatformToken() });
+    return {};
   } catch (e) {
-    redirect(`/admin?error=${encodeURIComponent(e instanceof ApiError ? e.message : "Could not delete company")}`);
+    return { error: e instanceof ApiError ? e.message : "Could not delete company" };
   }
-  redirect("/admin?notice=Company deleted");
 }
 
 export async function regenerateCompanyCode(id: number) {

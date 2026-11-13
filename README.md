@@ -69,7 +69,7 @@ npm install
 npm run dev
 ```
 
-Tables are created automatically on API startup. Seed the first platform admin via `SUPERADMIN_EMAIL` + `SUPERADMIN_PASSWORD` in `apps/web/backend/.env`.
+Tables are created automatically on API startup. Seed platform admins via `SUPERADMIN_EMAILS` (comma-separated) + `SUPERADMIN_PASSWORD` in `apps/web/backend/.env`. Only missing accounts are created — existing passwords are never overwritten.
 
 Mobile dev: set `EXPO_PUBLIC_API_URL=http://10.0.2.2:4000` in `apps/mobile/.env` (emulator) or your LAN/backend URL, then `npm run mobile`.
 
@@ -103,7 +103,7 @@ Mobile dev: set `EXPO_PUBLIC_API_URL=http://10.0.2.2:4000` in `apps/mobile/.env`
 
 `render.yaml` at the repo root is a Render Blueprint: it creates the web service (`apps/web/backend`) and a Postgres database. Render dashboard → **New → Blueprint** → pick this repo.
 
-Env vars to set after first deploy: `CORS_ORIGIN` and `APP_URL` (your Vercel URL), `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`, and SMTP vars for password-reset emails.
+Env vars to set after first deploy: `CORS_ORIGIN` and `APP_URL` (your Vercel URL), `SUPERADMIN_EMAILS`, `SUPERADMIN_PASSWORD`, and SMTP vars for password-reset emails.
 
 Note: Render's free Postgres expires after 30 days — upgrade or migrate before then.
 

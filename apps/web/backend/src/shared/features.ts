@@ -3,16 +3,16 @@
 // This is the base for future subscription plans — the superadmin toggles these per company.
 
 export const FEATURE_DEFS = {
-  callSync: { label: "Call sync", description: "Allow the Android app to upload call logs" },
-  locations: { label: "Location tracking", description: "Store last known device location from heartbeats" },
-  exports: { label: "CSV exports", description: "Export call logs, agents and companies as CSV" },
-  reports: { label: "Reports & dashboard", description: "Dashboard stats and call analytics" },
+  callSync: { label: "Call Sync", description: "Allow the Android app to upload call logs" },
+  locations: { label: "Location Tracking", description: "Store last known device location from heartbeats" },
+  exports: { label: "CSV Exports", description: "Export call logs, agents and companies as CSV" },
+  reports: { label: "Reports & Dashboard", description: "Dashboard stats and call analytics" },
 } as const;
 
 export type FeatureKey = keyof typeof FEATURE_DEFS;
 
 export const LIMIT_DEFS = {
-  maxAgents: { label: "Max agents", description: "Maximum agents per company (empty = unlimited)" },
+  maxAgents: { label: "Max Agents", description: "Maximum agents per company — up to 150" },
 } as const;
 
 export type LimitKey = keyof typeof LIMIT_DEFS;

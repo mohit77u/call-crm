@@ -4,7 +4,8 @@ import { SidebarLinks } from "@/components/sidebar-links";
 import { platformLogout } from "../actions";
 
 const ADMIN_LINKS = [
-  { href: "/admin", label: "Companies", exact: true },
+  { href: "/admin/dashboard", label: "Dashboard" },
+  { href: "/admin/companies", label: "Companies" },
   { href: "/admin/agents", label: "Agents" },
   { href: "/admin/calls", label: "Call logs" },
   { href: "/admin/companies/new", label: "+ New company" },
@@ -23,7 +24,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
           <button className="secondary" type="submit">Logout</button>
         </form>
       </nav>
-      <main className="main">{children}</main>
+      <main className="main admin-main">{children}</main>
     </div>
   );
 }

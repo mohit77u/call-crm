@@ -22,7 +22,10 @@ export const config = {
     .filter(Boolean),
   appUrl: (process.env.APP_URL ?? "http://localhost:3050").replace(/\/$/, ""),
   timeZone: process.env.CRM_TIME_ZONE ?? "Asia/Kolkata",
-  superadminEmail: process.env.SUPERADMIN_EMAIL?.trim().toLowerCase(),
+  superadminEmails: (process.env.SUPERADMIN_EMAILS ?? process.env.SUPERADMIN_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
   superadminPassword: process.env.SUPERADMIN_PASSWORD ?? "",
   contactTo: process.env.CONTACT_TO?.trim() || "mohiit77u@gmail.com",
   smtp: {

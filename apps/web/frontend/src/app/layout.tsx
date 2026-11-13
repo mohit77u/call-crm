@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import { MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
+import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,7 +23,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <MantineProvider
+          theme={{
+            primaryColor: "blue",
+            fontFamily: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif',
+          }}
+        >
+          <Notifications position="top-right" autoClose={4000} />
+          {children}
+        </MantineProvider>
+      </body>
     </html>
   );
 }

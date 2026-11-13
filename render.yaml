@@ -27,7 +27,7 @@ services:
         sync: false # same Vercel URL — used in password reset emails
       - key: CRM_TIME_ZONE
         value: Asia/Kolkata
-      - key: SUPERADMIN_EMAIL
+      - key: SUPERADMIN_EMAILS
         sync: false
       - key: SUPERADMIN_PASSWORD
         sync: false

@@ -2,7 +2,7 @@ import { AppDataSource } from "../../database";
 import { checkPassword } from "../../shared/password";
 import { signAppToken } from "../../shared/jwt";
 import { normalizeClientCode } from "../../shared/clientCode";
-import { CALL_TYPES, deriveStatus, type CallType } from "../../shared/calls";
+import { CALL_TYPES, TIME_ZONE, deriveStatus, type CallType } from "../../shared/calls";
 import { hasFeature } from "../../shared/features";
 import { notFound, unauthorized } from "../../shared/errors";
 import type { AppContext } from "../../middleware/auth";
@@ -63,11 +63,17 @@ function str(v: unknown) {
 
 export async function uploadCalls(session: AppContext, calls: IncomingCall[]) {
   const batch = Array.isArray(calls) ? calls.slice(0, MAX_BATCH) : [];
+  // Only accept calls from today (server timezone) — older history is never stored.
+  const [{ cutoff }] = await AppDataSource.query(
+    `SELECT (date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1) AS cutoff`,
+    [TIME_ZONE],
+  );
+  const cutoffMs = new Date(cutoff).getTime();
   let saved = 0;
   for (const c of batch) {
     const localId = String(c.id ?? "");
     const timestamp = Number(c.timestamp);
-    if (!localId || !Number.isFinite(timestamp)) continue;
+    if (!localId || !Number.isFinite(timestamp) || timestamp < cutoffMs) continue;
     const type: CallType = CALL_TYPES.includes(c.type as CallType) ? (c.type as CallType) : "unknown";
     const duration = Math.max(0, Math.floor(Number(c.durationSec) || 0));
     const rows = await AppDataSource.query(

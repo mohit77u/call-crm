@@ -65,7 +65,8 @@ export async function requestPasswordReset(email: string) {
     "INSERT INTO password_resets (email, role, token_hash, expires_at) VALUES ($1, $2, $3, now() + interval '1 hour')",
     [email, role, tokenHash(token)],
   );
-  const link = `${config.appUrl}/company/reset-password?token=${token}`;
+  const resetPath = role === "superadmin" ? "/admin/reset-password" : "/company/reset-password";
+  const link = `${config.appUrl}${resetPath}?token=${token}`;
   await sendMail({
     to: email,
     subject: "Reset your Call CRM password",

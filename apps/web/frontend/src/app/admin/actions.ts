@@ -3,12 +3,9 @@
 import { redirect } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { clearPlatformSession, setPlatformSession } from "@/lib/auth";
+import type { AuthFormState } from "@/lib/auth-actions";
 
-function fail(message: string): never {
-  redirect(`/admin/login?error=${encodeURIComponent(message)}`);
-}
-
-export async function platformLogin(form: FormData) {
+export async function platformLogin(_prev: AuthFormState, form: FormData): Promise<AuthFormState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
   let token: string;
@@ -16,10 +13,10 @@ export async function platformLogin(form: FormData) {
     const res = await apiFetch<{ token: string }>("/api/auth/platform/login", { body: { email, password } });
     token = res.token;
   } catch (e) {
-    fail(e instanceof ApiError ? e.message : "Login failed");
+    return { error: e instanceof ApiError ? e.message : "Login failed" };
   }
   await setPlatformSession(token!);
-  redirect("/admin");
+  redirect("/admin/dashboard");
 }
 
 export async function platformLogout() {

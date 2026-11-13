@@ -9,10 +9,20 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^7.0.6",
+    "@mantine/core": "^9.8.0",
+    "@mantine/form": "^9.8.0",
+    "@mantine/hooks": "^9.8.0",
+    "@mantine/notifications": "^9.8.0",
+    "@tailwindcss/postcss": "^4.3.5",
+    "lucide-react": "^1.72.0",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "recharts": "^3.10.1"
+    "react-hook-form": "^7.92.0",
+    "recharts": "^3.10.1",
+    "tailwindcss": "^4.3.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^20",

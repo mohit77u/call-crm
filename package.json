@@ -6,6 +6,7 @@
     "web:build": "npm run build --prefix apps/web/frontend",
     "web:start": "npm run start --prefix apps/web/frontend",
     "api": "npm run dev --prefix apps/web/backend",
+    "api:seed:admin": "npm run seed:admin --prefix apps/web/backend",
     "api:build": "npm run build --prefix apps/web/backend",
     "api:start": "npm run start --prefix apps/web/backend",
     "mobile": "npm run start --prefix apps/mobile"

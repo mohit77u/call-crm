@@ -5,6 +5,7 @@ node_modules/
 .idea/
 *.apk
 .call-crm.apk*
+.playwright*
 
 # local module build output
 apps/mobile/modules/call-log/android/build/

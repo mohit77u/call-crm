@@ -39,7 +39,6 @@ UPDATE companies SET features = '${DEFAULT_FEATURES}'::jsonb WHERE features IS N
 ALTER TABLE companies ALTER COLUMN features SET DEFAULT '${DEFAULT_FEATURES}'::jsonb;
 ALTER TABLE companies ALTER COLUMN features SET NOT NULL;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS plan TEXT;
-ALTER TABLE devices ADD COLUMN IF NOT EXISTS sync_requested_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS admins (
   id SERIAL PRIMARY KEY,
   company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
@@ -76,6 +75,7 @@ CREATE TABLE IF NOT EXISTS devices (
   location_accuracy DOUBLE PRECISION,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS sync_requested_at TIMESTAMPTZ;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_lat DOUBLE PRECISION;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS last_lng DOUBLE PRECISION;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS location_at TIMESTAMPTZ;
@@ -138,15 +138,17 @@ export async function bootstrapSchema() {
 }
 
 export async function seedSuperadmin() {
-  const email = config.superadminEmail;
   const password = config.superadminPassword;
-  if (!email || password.length < 8) return;
-  const existing = await AppDataSource.query("SELECT 1 FROM superadmins WHERE email = $1", [email]);
-  if (existing.length > 0) return;
-  await AppDataSource.query("INSERT INTO superadmins (name, email, password_hash) VALUES ($1, $2, $3)", [
-    "Admin",
-    email,
-    await hashPassword(password),
-  ]);
-  console.log(`Seeded superadmin: ${email}`);
+  if (config.superadminEmails.length === 0 || password.length < 8) return;
+  const hash = await hashPassword(password);
+  for (const email of config.superadminEmails) {
+    const existing = await AppDataSource.query("SELECT 1 FROM superadmins WHERE email = $1", [email]);
+    if (existing.length > 0) continue;
+    await AppDataSource.query("INSERT INTO superadmins (name, email, password_hash) VALUES ($1, $2, $3)", [
+      email.split("@")[0],
+      email,
+      hash,
+    ]);
+    console.log(`Seeded superadmin: ${email}`);
+  }
 }

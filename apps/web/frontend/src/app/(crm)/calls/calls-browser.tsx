@@ -115,7 +115,7 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
     <>
       <div className="page-head">
         <div>
-          <h1>Call logs</h1>
+          <h1>Call Logs</h1>
           <p className="page-sub">
             {data ? `${data.summary.total} calls · ${formatTalkTime(data.summary.talkSec)} talk time` : "Loading…"}
           </p>
