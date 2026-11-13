@@ -87,7 +87,7 @@ export async function exportCallsRows(companyId: number, f: CallFilters) {
   );
 }
 
-export async function platformListCalls(f: CallFilters, page: number) {
+export async function platformListCalls(f: CallFilters, page: number, perPage = PAGE_SIZE) {
   const { where, params } = buildPlatformCallWhere(f);
   const companies = await AppDataSource.query("SELECT id, name FROM companies ORDER BY name");
   const agents = await AppDataSource.query(
@@ -107,7 +107,7 @@ export async function platformListCalls(f: CallFilters, page: number) {
      FROM call_logs cl
      JOIN agents a ON a.id = cl.agent_id
      JOIN companies c ON c.id = cl.company_id
-     WHERE ${where} ORDER BY cl.started_at DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
+     WHERE ${where} ORDER BY cl.started_at DESC LIMIT ${perPage} OFFSET ${(page - 1) * perPage}`,
     params,
   );
   return {
@@ -116,7 +116,7 @@ export async function platformListCalls(f: CallFilters, page: number) {
     summary: { total, talkSec },
     calls,
     page,
-    pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+    pages: Math.max(1, Math.ceil(total / perPage)),
   };
 }
 

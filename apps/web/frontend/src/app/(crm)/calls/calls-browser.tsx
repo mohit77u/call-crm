@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { STATUSES, STATUS_LABELS, formatDateTime, formatDuration, todayInZone, type CallStatus } from "@/lib/calls";
+import { Pagination } from "@/components/pagination";
+import { SearchInput } from "@/components/search-input";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 type CallRow = { id: string; agent: string; phone_number: string; contact_name: string | null; call_type: string; status: CallStatus; started_at: string; duration_sec: number };
 type CallsResponse = { agents: { id: number; name: string }[]; summary: { total: number; talkSec: number }; calls: CallRow[]; page: number; perPage: number; pages: number };
 
 type Filters = { from: string; to: string; agent: string; status: string; q: string };
 
-const PER_PAGE_OPTIONS = [10, 20, 25, 50, 100];
 const EMPTY_FILTERS: Filters = { from: "", to: "", agent: "", status: "", q: "" };
 
 function addDays(dateStr: string, n: number) {
@@ -55,7 +57,7 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [draft, setDraft] = useState<Filters>(filters);
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [perPage, setPerPage] = useState(10);
   const [data, setData] = useState<CallsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -88,28 +90,21 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
     setDrawerOpen(false);
   };
   const clearFilters = () => {
-    const empty = { ...EMPTY_FILTERS };
-    setDraft(empty);
-    setFilters(empty);
+    const def = defaultFilters();
+    setDraft(def);
+    setFilters(def);
     setPage(1);
     setDrawerOpen(false);
   };
-  const quickSearch = (q: string) => {
-    setFilters((f) => ({ ...f, q }));
-    setPage(1);
-  };
-
   const exportQs = new URLSearchParams();
   for (const [k, v] of Object.entries(filters)) if (v) exportQs.set(k, v);
 
-  const pageNumbers = (() => {
-    if (!data) return [] as number[];
-    const { page: cur, pages } = data;
-    const nums: number[] = [];
-    const start = Math.max(1, Math.min(cur - 2, pages - 4));
-    for (let i = start; i <= Math.min(pages, start + 4); i++) nums.push(i);
-    return nums;
-  })();
+  const def = defaultFilters();
+  const appliedCount =
+    (filters.from !== def.from ? 1 : 0) +
+    (filters.to !== def.to ? 1 : 0) +
+    (filters.agent ? 1 : 0) +
+    (filters.status ? 1 : 0);
 
   return (
     <>
@@ -120,67 +115,60 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
             {data ? `${data.summary.total} calls · ${formatTalkTime(data.summary.talkSec)} talk time` : "Loading…"}
           </p>
         </div>
-        <div className="page-actions">
-          {canExport && <a className="btn secondary" href={`/api/calls/export?${exportQs}`}>Export CSV</a>}
-        </div>
       </div>
 
-      <div className="call-toolbar">
-        <input
-          className="search-box"
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <SearchInput
+          className="w-full max-w-xs"
           placeholder="Search number or name…"
-          defaultValue={filters.q}
-          onKeyDown={(e) => e.key === "Enter" && quickSearch((e.target as HTMLInputElement).value.trim())}
+          value={filters.q}
+          onSearch={(q) => { setFilters((f) => ({ ...f, q })); setPage(1); }}
         />
-        <button type="button" className="btn secondary" onClick={() => { setDraft(filters); setDrawerOpen(true); }}>
-          Filters{filters.agent || filters.status || filters.from !== defaultFilters().from || filters.to !== defaultFilters().to ? " •" : ""}
-        </button>
+        <div className="flex items-center gap-2">
+          {canExport && <a className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50" href={`/api/calls/export?${exportQs}`}>Export CSV</a>}
+          <button
+            type="button"
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            onClick={() => { setDraft(filters); setDrawerOpen(true); }}
+          >
+            Filters
+            {appliedCount > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">
+                {appliedCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {error && <div className="error" style={{ marginBottom: 12 }}>{error}</div>}
 
-      <div className="card">
-        <table>
-          <thead>
-            <tr><th>Time</th><th>Agent</th><th>Number</th><th>Name</th><th>Type</th><th>Status</th><th>Duration</th></tr>
-          </thead>
-          <tbody>
-            {(data?.calls ?? []).map((c) => (
-              <tr key={c.id}>
-                <td>{formatDateTime(c.started_at)}</td>
-                <td>{c.agent}</td>
-                <td>{c.phone_number}</td>
-                <td className="muted">{c.contact_name ?? "-"}</td>
-                <td>{typePill(c.call_type)}</td>
-                <td>{statusPill(c.status)}</td>
-                <td>{formatDuration(c.duration_sec)}</td>
-              </tr>
-            ))}
-            {!loading && (data?.calls.length ?? 0) === 0 && <tr><td colSpan={7} className="muted">No calls for these filters.</td></tr>}
-            {loading && <tr><td colSpan={7} className="muted">Loading…</td></tr>}
-          </tbody>
-        </table>
-
-        {data && data.pages > 1 && (
-          <div className="pager">
-            <button type="button" className="pg-btn" disabled={data.page <= 1} onClick={() => setPage(data.page - 1)}>← Prev</button>
-            {pageNumbers.map((n) => (
-              <button key={n} type="button" className={`pg-btn${n === data.page ? " active" : ""}`} onClick={() => setPage(n)}>{n}</button>
-            ))}
-            <button type="button" className="pg-btn" disabled={data.page >= data.pages} onClick={() => setPage(data.page + 1)}>Next →</button>
-            <span className="muted pager-info">Page {data.page} of {data.pages}</span>
-          </div>
-        )}
-
-        <div className="perpage-row">
-          <label>
-            Rows per page{" "}
-            <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
-              {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-        </div>
-      </div>
+      <DataTable
+        minHeight={300}
+        loading={loading}
+        emptyMessage="No calls for these filters."
+        rowKey={(c) => c.id}
+        rows={data?.calls ?? []}
+        footer={data ? (
+          <Pagination
+            page={data.page}
+            pages={data.pages}
+            total={data.summary.total}
+            perPage={data.perPage}
+            onPage={setPage}
+            onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+          />
+        ) : null}
+        columns={[
+            { header: "Time", cell: (c) => formatDateTime(c.started_at) },
+            { header: "Agent", cell: (c) => c.agent },
+            { header: "Number", cell: (c) => c.phone_number },
+            { header: "Name", cell: (c) => <span className="muted">{c.contact_name ?? "-"}</span> },
+            { header: "Type", cell: (c) => typePill(c.call_type) },
+            { header: "Status", cell: (c) => statusPill(c.status) },
+            { header: "Duration", cell: (c) => formatDuration(c.duration_sec) },
+          ] satisfies DataTableColumn<CallRow>[]}
+      />
 
       {drawerOpen && (
         <>

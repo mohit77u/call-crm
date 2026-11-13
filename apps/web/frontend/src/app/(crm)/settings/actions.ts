@@ -1,27 +1,32 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { getAdminToken, requireAdmin } from "@/lib/auth";
 
-export async function updateCompanyName(form: FormData) {
-  await requireAdmin();
-  const name = String(form.get("name") ?? "").trim();
-  if (!name) redirect("/settings?notice=Saved");
-  try {
-    await apiFetch("/api/crm/settings/name", { body: { name }, token: await getAdminToken() });
-  } catch (e) {
-    redirect(`/settings?error=${encodeURIComponent(e instanceof ApiError ? e.message : "Save failed")}`);
-  }
-  redirect("/settings?notice=Saved");
+export type SettingsActionState = { error?: string; notice?: string };
+
+function fail(e: unknown, fallback: string): SettingsActionState {
+  return { error: e instanceof ApiError ? e.message : fallback };
 }
 
-export async function regenerateClientCode() {
+export async function updateCompanyName(form: FormData): Promise<SettingsActionState> {
+  await requireAdmin();
+  const name = String(form.get("name") ?? "").trim();
+  if (!name) return { error: "Company name is required" };
+  try {
+    await apiFetch("/api/crm/settings/name", { body: { name }, token: await getAdminToken() });
+    return { notice: "Saved" };
+  } catch (e) {
+    return fail(e, "Save failed");
+  }
+}
+
+export async function regenerateClientCode(): Promise<SettingsActionState> {
   await requireAdmin();
   try {
     await apiFetch("/api/crm/settings/client-code", { method: "POST", token: await getAdminToken() });
-  } catch {
-    redirect("/settings?error=Could not regenerate code");
+    return { notice: "New client code generated" };
+  } catch (e) {
+    return fail(e, "Could not regenerate code");
   }
-  redirect("/settings?notice=New client code generated");
 }

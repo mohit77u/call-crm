@@ -5,6 +5,22 @@ import { clearSession, getSession, saveSession, setLastSyncAt, type SessionSim }
 
 const BATCH = 200;
 
+// Work-hours window: today 09:00–18:30 IST. Computed without device timezone
+// dependence — IST is fixed UTC+5:30, so 09:00 IST = 03:30 UTC, 18:30 IST = 13:00 UTC.
+function istWorkWindowMs(): { startMs: number; endMs: number } {
+  const todayIst = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const [y, m, d] = todayIst.split('-').map(Number);
+  return {
+    startMs: Date.UTC(y, m - 1, d, 3, 30, 0),
+    endMs: Date.UTC(y, m - 1, d, 13, 0, 0),
+  };
+}
+
 export type SyncResult =
   | { ok: true; uploaded: number; requested?: boolean }
   | { ok: false; reason: 'logged_out' | 'no_permission' | 'sim_unavailable' | 'error'; message?: string };
@@ -61,11 +77,13 @@ async function doSync(): Promise<SyncResult> {
 
     let uploaded = 0;
     let since = session.syncFrom;
+    const { startMs, endMs } = istWorkWindowMs();
     for (;;) {
       const calls = await CallLog.getCallsSince(since, BATCH, simFilter?.id ?? null, simFilter?.iccId ?? null);
       if (calls.length === 0) break;
-      await uploadCalls(session.token, calls);
-      uploaded += calls.length;
+      const inWindow = calls.filter((c) => c.timestamp >= startMs && c.timestamp < endMs);
+      if (inWindow.length > 0) await uploadCalls(session.token, inWindow);
+      uploaded += inWindow.length;
       since = calls[calls.length - 1].timestamp;
       await saveSession({ ...session, syncFrom: since });
       if (calls.length < BATCH) break;

@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { STATUSES, STATUS_LABELS, formatDateTime, formatDuration, todayInZone, type CallStatus } from "@/lib/calls";
+import { Pagination } from "@/components/pagination";
+import { SearchInput } from "@/components/search-input";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 type CallRow = {
   id: string;
@@ -53,6 +56,7 @@ export function CallsBrowser() {
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [draft, setDraft] = useState<Filters>(filters);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [data, setData] = useState<CallsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,7 +66,7 @@ export function CallsBrowser() {
     setLoading(true);
     setError("");
     try {
-      const sp = new URLSearchParams({ page: String(page) });
+      const sp = new URLSearchParams({ page: String(page), limit: String(perPage) });
       for (const [k, v] of Object.entries(filters)) if (v) sp.set(k, v);
       const res = await fetch(`/api/admin/calls?${sp}`);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Failed to load calls");
@@ -72,7 +76,7 @@ export function CallsBrowser() {
     } finally {
       setLoading(false);
     }
-  }, [filters, page]);
+  }, [filters, page, perPage]);
 
   useEffect(() => {
     const t = setTimeout(load, 0);
@@ -85,9 +89,9 @@ export function CallsBrowser() {
     setDrawerOpen(false);
   };
   const clearFilters = () => {
-    const empty = { ...EMPTY_FILTERS };
-    setDraft(empty);
-    setFilters(empty);
+    const def = defaultFilters();
+    setDraft(def);
+    setFilters(def);
     setPage(1);
     setDrawerOpen(false);
   };
@@ -95,76 +99,72 @@ export function CallsBrowser() {
   const exportQs = new URLSearchParams();
   for (const [k, v] of Object.entries(filters)) if (v) exportQs.set(k, v);
 
-  const hasActiveFilters = Boolean(filters.company || filters.agent || filters.status || filters.q || filters.from !== defaultFilters().from || filters.to !== defaultFilters().to);
+  const def = defaultFilters();
+  const appliedCount =
+    (filters.from !== def.from ? 1 : 0) +
+    (filters.to !== def.to ? 1 : 0) +
+    (filters.company ? 1 : 0) +
+    (filters.agent ? 1 : 0) +
+    (filters.status ? 1 : 0);
 
-  const pageNumbers = (() => {
-    if (!data) return [] as number[];
-    const { page: cur, pages } = data;
-    const nums: number[] = [];
-    const start = Math.max(1, Math.min(cur - 2, pages - 4));
-    for (let i = start; i <= Math.min(pages, start + 4); i++) nums.push(i);
-    return nums;
-  })();
+  const toolbarBtn =
+    "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50";
 
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
+        <SearchInput
+          className="w-full max-w-xs"
+          placeholder="Search number or name…"
+          value={filters.q}
+          onSearch={(q) => { setFilters((f) => ({ ...f, q })); setPage(1); }}
+        />
         <div className="flex items-center gap-2">
-          <input
-            className="h-9 w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
-            placeholder="Search number or name…"
-            defaultValue={filters.q}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const q = (e.target as HTMLInputElement).value.trim();
-                setFilters((f) => ({ ...f, q }));
-                setPage(1);
-              }
-            }}
-          />
-          <button type="button" className="btn secondary" onClick={() => { setDraft(filters); setDrawerOpen(true); }}>
-            Filters{hasActiveFilters ? " •" : ""}
+          <a className={toolbarBtn} href={`/api/admin/calls/export?${exportQs}`}>Export CSV</a>
+          <button
+            type="button"
+            className={toolbarBtn}
+            onClick={() => { setDraft(filters); setDrawerOpen(true); }}
+          >
+            Filters
+            {appliedCount > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">
+                {appliedCount}
+              </span>
+            )}
           </button>
         </div>
-        <a className="btn secondary" href={`/api/admin/calls/export?${exportQs}`}>Export CSV</a>
       </div>
 
       {error && <div className="error mb-3">{error}</div>}
 
-      <div className="card p-0">
-        <table>
-          <thead>
-            <tr><th>Time</th><th>Company</th><th>Agent</th><th>Number</th><th>Name</th><th>Type</th><th>Status</th><th>Duration</th></tr>
-          </thead>
-          <tbody>
-            {(data?.calls ?? []).map((c) => (
-              <tr key={c.id}>
-                <td>{formatDateTime(c.started_at)}</td>
-                <td>{c.company}</td>
-                <td>{c.agent}</td>
-                <td>{c.phone_number}</td>
-                <td className="muted">{c.contact_name ?? "-"}</td>
-                <td>{c.call_type === "outgoing" ? "Outgoing" : "Incoming"}</td>
-                <td><span className={`tpill ${STATUS_CLS[c.status] ?? "st-other"}`}>{STATUS_LABELS[c.status]}</span></td>
-                <td>{formatDuration(c.duration_sec)}</td>
-              </tr>
-            ))}
-            {!loading && (data?.calls.length ?? 0) === 0 && <tr><td colSpan={8} className="muted">No calls for these filters.</td></tr>}
-            {loading && <tr><td colSpan={8} className="muted">Loading…</td></tr>}
-          </tbody>
-        </table>
-
-        {data && data.pages > 1 && (
-          <div className="pager">
-            <button type="button" className="pg-btn" disabled={data.page <= 1} onClick={() => setPage(data.page - 1)}>← Prev</button>
-            {pageNumbers.map((n) => (
-              <button key={n} type="button" className={`pg-btn${n === data.page ? " active" : ""}`} onClick={() => setPage(n)}>{n}</button>
-            ))}
-            <button type="button" className="pg-btn" disabled={data.page >= data.pages} onClick={() => setPage(data.page + 1)}>Next →</button>
-            <span className="muted pager-info">Page {data.page} of {data.pages}</span>
-          </div>
-        )}
-      </div>
+      <DataTable
+        minHeight={300}
+        loading={loading}
+        emptyMessage="No calls for these filters."
+        rowKey={(c) => c.id}
+        rows={data?.calls ?? []}
+        footer={data ? (
+          <Pagination
+            page={data.page}
+            pages={data.pages}
+            total={data.summary.total}
+            perPage={perPage}
+            onPage={setPage}
+            onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+          />
+        ) : null}
+        columns={[
+            { header: "Time", cell: (c) => formatDateTime(c.started_at) },
+            { header: "Company", cell: (c) => c.company },
+            { header: "Agent", cell: (c) => c.agent },
+            { header: "Number", cell: (c) => c.phone_number },
+            { header: "Name", cell: (c) => <span className="muted">{c.contact_name ?? "-"}</span> },
+            { header: "Type", cell: (c) => (c.call_type === "outgoing" ? "Outgoing" : "Incoming") },
+            { header: "Status", cell: (c) => <span className={`tpill ${STATUS_CLS[c.status] ?? "st-other"}`}>{STATUS_LABELS[c.status]}</span> },
+            { header: "Duration", cell: (c) => formatDuration(c.duration_sec) },
+          ] satisfies DataTableColumn<CallRow>[]}
+      />
 
       {drawerOpen && (
         <>

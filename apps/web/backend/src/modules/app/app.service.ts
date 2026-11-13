@@ -63,17 +63,20 @@ function str(v: unknown) {
 
 export async function uploadCalls(session: AppContext, calls: IncomingCall[]) {
   const batch = Array.isArray(calls) ? calls.slice(0, MAX_BATCH) : [];
-  // Only accept calls from today (server timezone) — older history is never stored.
-  const [{ cutoff }] = await AppDataSource.query(
-    `SELECT (date_trunc('day', now() AT TIME ZONE $1) AT TIME ZONE $1) AS cutoff`,
+  // Only accept calls from today within work hours 09:00–18:30 (server timezone).
+  const [{ day_start, day_end }] = await AppDataSource.query(
+    `SELECT
+       ((date_trunc('day', now() AT TIME ZONE $1) + interval '9 hours') AT TIME ZONE $1) AS day_start,
+       ((date_trunc('day', now() AT TIME ZONE $1) + interval '18 hours 30 minutes') AT TIME ZONE $1) AS day_end`,
     [TIME_ZONE],
   );
-  const cutoffMs = new Date(cutoff).getTime();
+  const startMs = new Date(day_start).getTime();
+  const endMs = new Date(day_end).getTime();
   let saved = 0;
   for (const c of batch) {
     const localId = String(c.id ?? "");
     const timestamp = Number(c.timestamp);
-    if (!localId || !Number.isFinite(timestamp) || timestamp < cutoffMs) continue;
+    if (!localId || !Number.isFinite(timestamp) || timestamp < startMs || timestamp >= endMs) continue;
     const type: CallType = CALL_TYPES.includes(c.type as CallType) ? (c.type as CallType) : "unknown";
     const duration = Math.max(0, Math.floor(Number(c.durationSec) || 0));
     const rows = await AppDataSource.query(

@@ -205,7 +205,7 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
     setBusy(false);
   };
 
-  // Lightweight poll: check for an admin "Sync now" request every 30s and run a
+  // Lightweight poll: check for an admin "Sync now" request every 5s and run a
   // full sync immediately when one is pending (instead of waiting for the 60s cycle).
   const pollSyncRequest = useCallback(async () => {
     const s = await getSession();
@@ -228,7 +228,7 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
     setTimeout(kickoff, 0);
     const sub = AppState.addEventListener('change', (state) => state === 'active' && sync());
     const timer = setInterval(sync, 60_000);
-    const pollTimer = setInterval(pollSyncRequest, 30_000);
+    const pollTimer = setInterval(pollSyncRequest, 5_000);
     return () => {
       sub.remove();
       clearInterval(timer);
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e3e6eb', borderRadius: 8, padding: 12, fontSize: 16, marginTop: 12, color: '#0f172a' },
   passwordWrap: { position: 'relative', justifyContent: 'center' },
   passwordInput: { paddingRight: 44 },
-  eyeBtn: { position: 'absolute', right: 12, padding: 4 },
+  eyeBtn: { position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center', padding: 4 },
   codeInput: { fontSize: 22, letterSpacing: 3, textAlign: 'center', marginTop: 20 },
   error: { color: '#c62828', marginTop: 10 },
   button: { backgroundColor: '#2556d9', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 16 },

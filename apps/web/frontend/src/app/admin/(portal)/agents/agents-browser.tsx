@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { formatDateTime } from "@/lib/calls";
+import { SearchInput } from "@/components/search-input";
+import { DataTable } from "@/components/data-table";
 
 export type AgentRow = {
   id: number;
@@ -37,15 +39,7 @@ export function AgentsBrowser({ agents, companies, initialCompany }: { agents: A
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="relative w-full max-w-xs">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search name, username, company…"
-              className="h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20"
-            />
-          </div>
+          <SearchInput value={q} onSearch={setQ} placeholder="Search name, username, company…" className="w-full max-w-xs" />
           <div className="relative">
             <select
               value={company}
@@ -63,26 +57,19 @@ export function AgentsBrowser({ agents, companies, initialCompany }: { agents: A
         </div>
       </div>
 
-      <div className="card p-0">
-        <table>
-          <thead>
-            <tr><th>Company</th><th>Name</th><th>Username</th><th>Phone</th><th>Status</th><th>Last Sync</th></tr>
-          </thead>
-          <tbody>
-            {filtered.map((a) => (
-              <tr key={a.id}>
-                <td><Link href={`/admin/companies/${a.company_id}`}>{a.company}</Link></td>
-                <td>{a.name}</td>
-                <td>{a.username}</td>
-                <td>{a.phone ?? "-"}</td>
-                <td>{a.active ? "Active" : <span className="muted">Disabled</span>}</td>
-                <td className="muted">{a.last_sync_at ? formatDateTime(a.last_sync_at) : "Never"}</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && <tr><td colSpan={6} className="muted">{q || company ? "No agents match your filters." : "No agents yet."}</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+          rowKey={(a) => a.id}
+          rows={filtered}
+          emptyMessage={q || company ? "No agents match your filters." : "No agents yet."}
+          columns={[
+            { header: "Company", cell: (a) => <Link href={`/admin/companies/${a.company_id}`}>{a.company}</Link> },
+            { header: "Name", cell: (a) => a.name },
+            { header: "Username", cell: (a) => a.username },
+            { header: "Phone", cell: (a) => a.phone ?? "-" },
+            { header: "Status", cell: (a) => (a.active ? "Active" : <span className="muted">Disabled</span>) },
+            { header: "Last Sync", cell: (a) => <span className="muted">{a.last_sync_at ? formatDateTime(a.last_sync_at) : "Never"}</span> },
+          ]}
+        />
     </>
   );
 }

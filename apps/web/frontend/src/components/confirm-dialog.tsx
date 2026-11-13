@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { X } from "lucide-react";
 import { Spinner } from "@/components/spinner";
 
 type ConfirmDialogProps = {
@@ -43,12 +44,21 @@ export function ConfirmDialog({
       onClick={() => !pending && onClose()}
     >
       <div
-        className="w-full max-w-sm whitespace-normal rounded-xl bg-white p-5 text-left shadow-xl"
+        className="relative w-full max-w-sm whitespace-normal rounded-xl bg-white p-5 text-left shadow-xl"
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
         aria-modal="true"
       >
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={pending}
+          aria-label="Close"
+          className="absolute right-3 top-3 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent p-0! text-slate-400 shadow-none transition-colors hover:bg-slate-100 hover:text-slate-600"
+        >
+          <X size={16} />
+        </button>
+        <h3 className="pr-8 text-base font-semibold text-slate-900">{title}</h3>
         {message && <p className="mt-2 text-sm text-slate-500">{message}</p>}
         <div className="mt-5 flex justify-end gap-2">
           <button

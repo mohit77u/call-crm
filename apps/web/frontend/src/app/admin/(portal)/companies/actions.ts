@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { getPlatformToken, requireSuperadmin } from "@/lib/auth";
 import { FEATURE_DEFS, type FeatureKey } from "@/lib/features";
@@ -39,7 +38,9 @@ export async function createCompany(_prev: CompanyFormState, form: FormData): Pr
   }
 }
 
-export async function updateCompany(id: number, form: FormData) {
+export type CompanyActionState = { error?: string; notice?: string };
+
+export async function updateCompany(id: number, form: FormData): Promise<CompanyActionState> {
   await requireSuperadmin();
   const name = String(form.get("name") ?? "").trim();
   const features: Record<string, boolean | number | null> = {};
@@ -56,9 +57,9 @@ export async function updateCompany(id: number, form: FormData) {
       token: await getPlatformToken(),
     });
   } catch (e) {
-    redirect(`/admin/companies/${id}?error=${encodeURIComponent(e instanceof ApiError ? e.message : "Save failed")}`);
+    return { error: e instanceof ApiError ? e.message : "Save failed" };
   }
-  redirect(`/admin/companies/${id}?notice=Saved`);
+  return { notice: "Saved" };
 }
 
 export async function deleteCompany(id: number): Promise<{ error?: string }> {
@@ -71,12 +72,12 @@ export async function deleteCompany(id: number): Promise<{ error?: string }> {
   }
 }
 
-export async function regenerateCompanyCode(id: number) {
+export async function regenerateCompanyCode(id: number): Promise<CompanyActionState> {
   await requireSuperadmin();
   try {
     await apiFetch(`/api/admin/companies/${id}/client-code`, { method: "POST", token: await getPlatformToken() });
-  } catch {
-    redirect(`/admin/companies/${id}?error=Could not regenerate code`);
+    return { notice: "New client code generated" };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not regenerate code" };
   }
-  redirect(`/admin/companies/${id}?notice=New client code generated`);
 }

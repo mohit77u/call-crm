@@ -69,7 +69,7 @@ export function RowActionsMenu({ editHref, itemName, itemLabel = "item", deleteA
               setOpen(false);
               setConfirmOpen(true);
             }}
-            className="flex w-full items-center gap-2 bg-red-50 px-3 py-2 text-left text-sm text-red-500"
+            className="flex w-full items-center gap-2 rounded-none border-0 bg-red-50 px-3 py-2 text-left text-sm text-red-500 shadow-none"
           >
             <Trash2 size={14} className="text-red-400" /> Delete
           </button>

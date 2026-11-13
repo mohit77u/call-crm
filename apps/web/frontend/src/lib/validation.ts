@@ -38,7 +38,24 @@ export const createCompanySchema = z.object({
     .max(100, "Admin Password must be 100 characters or less"),
 });
 
+export const createAgentSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
+  username: z
+    .string()
+    .trim()
+    .min(1, "Username is required")
+    .regex(/^[a-z0-9._-]{3,30}$/, "Username must be 3-30 letters, digits, . _ or -"),
+  phone: z.string().trim().min(1, "Phone is required").max(20, "Phone must be 20 characters or less"),
+  password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password must be 100 characters or less"),
+});
+
+export const resetAgentPasswordSchema = z.object({
+  password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password must be 100 characters or less"),
+});
+
 export type LoginFormValues = z.infer<typeof loginFormSchema>;
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 export type CreateCompanyValues = z.infer<typeof createCompanySchema>;
+export type CreateAgentValues = z.infer<typeof createAgentSchema>;
+export type ResetAgentPasswordValues = z.infer<typeof resetAgentPasswordSchema>;

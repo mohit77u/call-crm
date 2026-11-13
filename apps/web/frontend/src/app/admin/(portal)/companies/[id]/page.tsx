@@ -4,8 +4,8 @@ import { requireSuperadmin, getPlatformToken } from "@/lib/auth";
 import { apiFetch, ApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/calls";
 import { planDisplayName } from "@/lib/plans";
-import { regenerateCompanyCode } from "../actions";
 import { CompanyEditForm } from "../company-edit-form";
+import { RegenerateCodeButton } from "../regenerate-code-button";
 
 export const metadata = { title: "Company details" };
 
@@ -23,10 +23,9 @@ type CompanyDetail = {
   counts: { agents: number; calls: number; devices: number } | null;
 };
 
-export default async function CompanyDetailPage({ params, searchParams }: PageProps<"/admin/companies/[id]">) {
+export default async function CompanyDetailPage({ params }: PageProps<"/admin/companies/[id]">) {
   await requireSuperadmin();
   const { id } = await params;
-  const { created, notice, error } = await searchParams;
   let data: CompanyDetail;
   try {
     data = await apiFetch<CompanyDetail>(`/api/admin/companies/${id}`, { token: await getPlatformToken() });
@@ -40,13 +39,6 @@ export default async function CompanyDetailPage({ params, searchParams }: PagePr
     <>
       <p><Link href="/admin/companies">&larr; Companies</Link></p>
       <h1>{company.name} <span className="badge other" style={{ verticalAlign: "middle" }}>{planDisplayName(company.plan)}</span></h1>
-      {created && (
-        <div className="notice">
-          Company created. Client code: <span className="code" style={{ fontSize: 18 }}>{company.clientCode}</span> — share it with the company admin ({admins[0]?.email}).
-        </div>
-      )}
-      {notice && <div className="notice">{notice}</div>}
-      {error && <div className="error">{error}</div>}
 
       <div className="stats">
         <div className="stat"><div className="label">Agents</div><div className="value">{counts?.agents ?? 0}</div></div>
@@ -65,10 +57,10 @@ export default async function CompanyDetailPage({ params, searchParams }: PagePr
       <div className="card">
         <h2>Client code</h2>
         <div className="code">{company.clientCode}</div>
-        <form action={regenerateCompanyCode.bind(null, company.id)} style={{ marginTop: 12 }}>
-          <button className="secondary" type="submit">Generate new code</button>
+        <div style={{ marginTop: 12 }}>
+          <RegenerateCodeButton companyId={company.id} />
           <span className="muted" style={{ marginLeft: 8 }}>Existing logged-in phones stay connected.</span>
-        </form>
+        </div>
       </div>
 
       <div className="card">
