@@ -22,7 +22,7 @@ export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = fa
   return (
     <div
       className="mb-3.5 overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
-      style={minHeight ? { minHeight } : undefined}
+      style={minHeight && loading ? { minHeight } : undefined}
     >
       <table className="w-full border-collapse">
         <thead>
