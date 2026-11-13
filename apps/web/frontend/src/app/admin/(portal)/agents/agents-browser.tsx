@@ -48,7 +48,7 @@ export function AgentsBrowser({ agents, companies }: { agents: AgentRow[]; compa
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <SearchInput value={q} onSearch={setQ} placeholder="Search name, username, company…" className="w-full max-w-xs" />
+          <SearchInput value={q} onSearch={setQ} placeholder="Search" className="w-full max-w-xs" />
           <div className="relative">
             <select
               value={company}

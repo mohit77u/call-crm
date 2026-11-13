@@ -138,7 +138,7 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
       <div className="mb-2 flex items-center justify-between gap-2">
         <SearchInput
           className="w-full max-w-xs"
-          placeholder="Search number or name…"
+          placeholder="Search"
           value={filters.q}
           onSearch={(q) => { setFilters((f) => ({ ...f, q })); setPage(1); }}
         />
@@ -162,7 +162,6 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
       {error && <div className="error" style={{ marginBottom: 12 }}>{error}</div>}
 
       <DataTable
-        minHeight={300}
         loading={loading}
         emptyMessage="No calls for these filters."
         rowKey={(c) => c.id}

@@ -134,7 +134,7 @@ export function CallsBrowser() {
       <div className="mb-3 flex items-center justify-between gap-2">
         <SearchInput
           className="w-full max-w-xs"
-          placeholder="Search number or name…"
+          placeholder="Search"
           value={filters.q}
           onSearch={(q) => { setFilters((f) => ({ ...f, q })); setPage(1); }}
         />
@@ -158,7 +158,6 @@ export function CallsBrowser() {
       {error && <div className="error mb-3">{error}</div>}
 
       <DataTable
-        minHeight={300}
         loading={loading}
         emptyMessage="No calls for these filters."
         rowKey={(c) => c.id}

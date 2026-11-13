@@ -38,7 +38,7 @@ export function Pagination({ page, pages, total, perPage, onPage, onPerPageChang
         {onPerPageChange && (
           <label className="flex items-center gap-1.5 text-[13px] text-slate-500">
             Per page
-            <span className="relative inline-flex">
+            <span className="relative inline-flex h-8 items-center">
               <select
                 value={perPage}
                 onChange={(e) => onPerPageChange(Number(e.target.value))}
@@ -46,7 +46,7 @@ export function Pagination({ page, pages, total, perPage, onPage, onPerPageChang
               >
                 {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             </span>
           </label>
         )}

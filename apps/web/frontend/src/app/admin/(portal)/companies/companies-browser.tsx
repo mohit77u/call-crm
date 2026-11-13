@@ -37,7 +37,7 @@ export function CompaniesBrowser({ companies }: { companies: CompanyRow[] }) {
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <SearchInput value={q} onSearch={setQ} placeholder="Search name, client code, email…" className="w-full max-w-xs" />
+        <SearchInput value={q} onSearch={setQ} placeholder="Search" className="w-full max-w-xs" />
         <div className="flex items-center gap-2">
           <a className="btn secondary" href={`/api/admin/companies/export${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`}>Export CSV</a>
           <Link className="btn" href="/admin/companies/new">+ New Company</Link>

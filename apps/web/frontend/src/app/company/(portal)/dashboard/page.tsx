@@ -5,6 +5,7 @@ import { formatDateTime, formatMinutes, todayInZone } from "@/lib/calls";
 import { CallsBarChart, StatusDonut } from "./charts";
 import { PeriodPills } from "./period-pills";
 import { AgentCallsLink } from "./agent-calls-link";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 export const metadata = { title: "Dashboard" };
 
@@ -80,6 +81,30 @@ export default async function Dashboard() {
     { name: "Missed / other", value: t.total - t.connected - t.received, color: "#f59e0b" },
   ];
 
+  const agentColumns: DataTableColumn<AgentRow>[] = [
+    { header: "Agent", cell: (a) => <AgentCallsLink agentId={a.id} name={a.name} from={from} to={to} /> },
+    { header: "Total", cell: (a) => a.total },
+    { header: "Connected", cell: (a) => a.connected },
+    { header: "Not connected", cell: (a) => a.not_connected },
+    { header: "Received", cell: (a) => a.received },
+    { header: "Missed", cell: (a) => a.missed },
+    { header: "Talk time", cell: (a) => formatMinutes(a.talk_sec) },
+    { header: "Last sync", cell: (a) => <span className="muted">{a.last_sync_at ? formatDateTime(a.last_sync_at) : "Never"}</span> },
+  ];
+  if (canLocation) {
+    agentColumns.push({
+      header: "Location",
+      cell: (a) =>
+        a.location ? (
+          <a href={`https://maps.google.com/?q=${a.location.lat},${a.location.lng}`} target="_blank" rel="noreferrer" className="muted">
+            {a.location.lat.toFixed(4)}, {a.location.lng.toFixed(4)}
+          </a>
+        ) : (
+          <span className="muted">-</span>
+        ),
+    });
+  }
+
   return (
     <>
       <div className="page-head">
@@ -114,33 +139,14 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      <div className="card">
+      <div>
         <h2>Agent leaderboard</h2>
-        <table>
-          <thead>
-            <tr><th>Agent</th><th>Total</th><th>Connected</th><th>Not connected</th><th>Received</th><th>Missed</th><th>Talk time</th><th>Last sync</th>{canLocation && <th>Location</th>}</tr>
-          </thead>
-          <tbody>
-            {data.agents.map((a) => (
-              <tr key={a.id}>
-                <td><AgentCallsLink agentId={a.id} name={a.name} from={from} to={to} /></td>
-                <td>{a.total}</td><td>{a.connected}</td><td>{a.not_connected}</td><td>{a.received}</td><td>{a.missed}</td>
-                <td>{formatMinutes(a.talk_sec)}</td>
-                <td className="muted">{a.last_sync_at ? formatDateTime(a.last_sync_at) : "Never"}</td>
-                {canLocation && (
-                  <td>
-                    {a.location ? (
-                      <a href={`https://maps.google.com/?q=${a.location.lat},${a.location.lng}`} target="_blank" rel="noreferrer" className="muted">
-                        {a.location.lat.toFixed(4)}, {a.location.lng.toFixed(4)}
-                      </a>
-                    ) : <span className="muted">-</span>}
-                  </td>
-                )}
-              </tr>
-            ))}
-            {data.agents.length === 0 && <tr><td colSpan={canLocation ? 9 : 8} className="muted">No agents yet. Add them on the Agents page.</td></tr>}
-          </tbody>
-        </table>
+        <DataTable
+          rowKey={(a) => a.id}
+          rows={data.agents}
+          emptyMessage="No agents yet. Add them on the Agents page."
+          columns={agentColumns}
+        />
       </div>
     </>
   );
