@@ -24,7 +24,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
       </header>
       <main>{children}</main>
       <footer className="site-footer">
-        <div className="site-nav-inner footer-grid">
+        <div className="footer-inner footer-grid">
           <div>
             <div className="site-brand" style={{ color: "#fff" }}>
               <Image src="/logo.png" width={26} height={26} alt="" />
@@ -50,8 +50,10 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
             <Link href="/company/login">Company login</Link>
           </div>
         </div>
-        <div className="site-nav-inner footer-bottom muted">
-          © {new Date().getFullYear()} Call CRM. All rights reserved.
+        <div className="footer-bottom">
+          <div className="footer-inner footer-bottom-inner muted">
+            © {new Date().getFullYear()} Call CRM. All rights reserved.
+          </div>
         </div>
       </footer>
     </div>
