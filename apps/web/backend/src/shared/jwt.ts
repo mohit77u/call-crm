@@ -4,7 +4,8 @@ import { config } from "../config";
 export type AdminToken = { typ: "admin"; adminId: number; companyId: number };
 export type PlatformToken = { typ: "platform"; superadminId: number };
 export type AppToken = { typ: "app"; deviceId: number; agentId: number; companyId: number };
-export type TokenPayload = AdminToken | PlatformToken | AppToken;
+export type RefreshToken = { typ: "refresh"; role: "admin" | "platform"; userId: number };
+export type TokenPayload = AdminToken | PlatformToken | AppToken | RefreshToken;
 
 const secret = () => config.authSecret;
 
@@ -12,9 +13,12 @@ function sign(payload: TokenPayload, expiresIn: jwt.SignOptions["expiresIn"]) {
   return jwt.sign(payload, secret(), { expiresIn });
 }
 
-export const signAdminToken = (p: Omit<AdminToken, "typ">) => sign({ typ: "admin", ...p }, "7d");
-export const signPlatformToken = (p: Omit<PlatformToken, "typ">) => sign({ typ: "platform", ...p }, "7d");
+const ttl = (v: string) => v as jwt.SignOptions["expiresIn"];
+
+export const signAdminToken = (p: Omit<AdminToken, "typ">) => sign({ typ: "admin", ...p }, ttl(config.accessTokenTtl));
+export const signPlatformToken = (p: Omit<PlatformToken, "typ">) => sign({ typ: "platform", ...p }, ttl(config.accessTokenTtl));
 export const signAppToken = (p: Omit<AppToken, "typ">) => sign({ typ: "app", ...p }, "365d");
+export const signRefreshToken = (p: Omit<RefreshToken, "typ">) => sign({ typ: "refresh", ...p }, ttl(config.refreshTokenTtl));
 
 export function verifyToken<T extends TokenPayload>(token: string): T | null {
   try {

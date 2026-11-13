@@ -24,7 +24,7 @@ function trend(cur: number, prev: number) {
   return { text: `${pct > 0 ? "+" : ""}${pct}%`, up: pct >= 0 };
 }
 
-export default async function Dashboard({ searchParams }: PageProps<"/dashboard">) {
+export default async function Dashboard({ searchParams }: PageProps<"/company/dashboard">) {
   const admin = await requireAdmin();
   const sp = await searchParams;
   const days = DAY_OPTIONS.includes(Number(sp.days)) ? Number(sp.days) : 7;

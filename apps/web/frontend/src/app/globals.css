@@ -452,6 +452,7 @@ th { position: sticky; top: 0; background: #fff; }
 .site-nav { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px); background: rgba(255,255,255,0.82); border-bottom: 1px solid rgba(226,232,240,0.8); }
 
 .hero-v2 { position: relative; overflow: hidden; padding: 90px 24px 100px; }
+.hero-v2::before, .hero-v2::after { pointer-events: none; }
 .hero-v2::before {
   content: ""; position: absolute; inset: 0;
   background:

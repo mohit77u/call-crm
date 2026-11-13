@@ -86,7 +86,7 @@ export default function HomePage() {
             </p>
             <div className="hero-cta">
               <Link href="/pricing" className="btn btn-lg">View pricing</Link>
-              <Link href="/company/login" className="btn btn-lg secondary-ghost">Customer login</Link>
+              <Link href="/company/login" target="_blank" rel="noopener noreferrer" className="btn btn-lg secondary-ghost">Customer login</Link>
             </div>
             <div className="hero-points">
               <span>✓ Automatic background sync</span>

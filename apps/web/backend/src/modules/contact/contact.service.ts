@@ -22,8 +22,9 @@ export async function submitEnquiry(body: unknown) {
   const repo = AppDataSource.getRepository(ContactEnquiry);
   const enquiry = await repo.save(repo.create({ name, email, company: company || null, plan: plan || null, message: message || null }));
 
-  const to = config.contactTo;
-  if (to && mailConfigured()) {
+  const toList = config.contactTo.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (toList.length > 0 && mailConfigured()) {
+    const to = toList.join(", ");
     const planLabel = plan || "General";
     const subject = `New Call CRM enquiry — ${planLabel} plan`;
     const text = [
@@ -49,7 +50,7 @@ export async function submitEnquiry(body: unknown) {
     );
     // Admin copy + confirmation copy to the person who submitted the form.
     await sendMail({ to, subject, text, html }).catch((e) => console.error("Enquiry email failed:", e));
-    if (email && email.toLowerCase() !== to.toLowerCase()) {
+    if (email && !toList.includes(email.toLowerCase())) {
       await sendMail({
         to: email,
         subject: "We received your Call CRM enquiry",

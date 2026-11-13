@@ -17,7 +17,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
             <Link href="/contact">Contact</Link>
           </nav>
           <div className="site-actions">
-            <Link href="/company/login" className="btn secondary">Login</Link>
+            <Link href="/company/login" target="_blank" rel="noopener noreferrer" className="btn secondary">Login</Link>
             <Link href="/pricing" className="btn">Get started</Link>
           </div>
         </div>
@@ -47,7 +47,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
           </div>
           <div className="footer-col">
             <b>Account</b>
-            <Link href="/company/login">Company login</Link>
+            <Link href="/company/login" target="_blank" rel="noopener noreferrer">Company login</Link>
           </div>
         </div>
         <div className="footer-bottom">

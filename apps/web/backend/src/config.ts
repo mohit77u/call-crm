@@ -16,6 +16,8 @@ export const config = {
     }
     return secret ?? "dev-only-secret-change-me";
   })(),
+  accessTokenTtl: process.env.ACCESS_TOKEN_TTL ?? "30m",
+  refreshTokenTtl: process.env.REFRESH_TOKEN_TTL ?? "180d",
   corsOrigins: (process.env.CORS_ORIGIN ?? "http://localhost:3050")
     .split(",")
     .map((s) => s.trim())

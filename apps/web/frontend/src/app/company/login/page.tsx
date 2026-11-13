@@ -1,10 +1,14 @@
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { login } from "../actions";
 import { LoginForm } from "@/components/auth/login-form";
+import { getAdmin } from "@/lib/auth";
 
 export const metadata = { title: "Login" };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const admin = await getAdmin();
+  if (admin) redirect("/company/dashboard");
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-5">
       <div className="w-[400px] rounded-2xl bg-white p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">

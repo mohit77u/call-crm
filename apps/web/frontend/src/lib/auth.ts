@@ -4,8 +4,13 @@ import { redirect } from "next/navigation";
 import { apiFetch } from "./api";
 
 const SESSION_COOKIE = "crm_session";
+const SESSION_REFRESH_COOKIE = "crm_session_refresh";
 const PLATFORM_COOKIE = "crm_platform";
-const SESSION_DAYS = 7;
+const PLATFORM_REFRESH_COOKIE = "crm_platform_refresh";
+// Access tokens live 30min (backend ACCESS_TOKEN_TTL); refresh tokens 6 months
+// (REFRESH_TOKEN_TTL). Cookies mirror those lifetimes.
+const ACCESS_MAX_AGE = 30 * 60;
+const REFRESH_MAX_AGE = 180 * 24 * 3600;
 
 export type FeatureValue = boolean | number | null;
 export type CompanyFeatures = Record<string, FeatureValue>;
@@ -27,23 +32,30 @@ const cookieBase = {
   sameSite: "lax" as const,
   secure: process.env.NODE_ENV === "production",
   path: "/",
-  maxAge: SESSION_DAYS * 24 * 3600,
 };
 
-export async function setAdminSession(token: string) {
-  (await cookies()).set(SESSION_COOKIE, token, cookieBase);
+export async function setAdminSession(token: string, refreshToken: string) {
+  const store = await cookies();
+  store.set(SESSION_COOKIE, token, { ...cookieBase, maxAge: ACCESS_MAX_AGE });
+  store.set(SESSION_REFRESH_COOKIE, refreshToken, { ...cookieBase, maxAge: REFRESH_MAX_AGE });
 }
 
 export async function clearAdminSession() {
-  (await cookies()).delete(SESSION_COOKIE);
+  const store = await cookies();
+  store.delete(SESSION_COOKIE);
+  store.delete(SESSION_REFRESH_COOKIE);
 }
 
-export async function setPlatformSession(token: string) {
-  (await cookies()).set(PLATFORM_COOKIE, token, cookieBase);
+export async function setPlatformSession(token: string, refreshToken: string) {
+  const store = await cookies();
+  store.set(PLATFORM_COOKIE, token, { ...cookieBase, maxAge: ACCESS_MAX_AGE });
+  store.set(PLATFORM_REFRESH_COOKIE, refreshToken, { ...cookieBase, maxAge: REFRESH_MAX_AGE });
 }
 
 export async function clearPlatformSession() {
-  (await cookies()).delete(PLATFORM_COOKIE);
+  const store = await cookies();
+  store.delete(PLATFORM_COOKIE);
+  store.delete(PLATFORM_REFRESH_COOKIE);
 }
 
 async function readCookie(name: string) {
@@ -52,6 +64,8 @@ async function readCookie(name: string) {
 
 export const getAdminToken = () => readCookie(SESSION_COOKIE);
 export const getPlatformToken = () => readCookie(PLATFORM_COOKIE);
+export const getAdminRefreshToken = () => readCookie(SESSION_REFRESH_COOKIE);
+export const getPlatformRefreshToken = () => readCookie(PLATFORM_REFRESH_COOKIE);
 
 export const getAdmin = cache(async (): Promise<CurrentAdmin | null> => {
   const token = await getAdminToken();

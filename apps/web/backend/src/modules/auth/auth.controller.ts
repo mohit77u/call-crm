@@ -12,6 +12,7 @@ const emailSchema = z.string().trim().toLowerCase().email().max(200);
 const passwordSchema = z.string().min(1).max(200);
 
 const loginSchema = z.object({ email: emailSchema, password: passwordSchema });
+const refreshSchema = z.object({ refreshToken: z.string().min(1).max(4000) });
 const forgotSchema = z.object({ email: emailSchema });
 const resetSchema = z.object({ token: z.string().min(1).max(200), password: z.string().min(8).max(200) });
 
@@ -27,6 +28,24 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const { email, password } = parse(loginSchema, req.body);
     res.json(await authService.adminLogin(email, password));
+  }),
+);
+
+authRouter.post(
+  "/refresh",
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { refreshToken } = parse(refreshSchema, req.body);
+    res.json(await authService.refreshSession(refreshToken));
+  }),
+);
+
+authRouter.post(
+  "/logout",
+  asyncHandler(async (req, res) => {
+    const { refreshToken } = parse(refreshSchema, req.body);
+    await authService.logoutSession(refreshToken);
+    res.json({ ok: true });
   }),
 );
 

@@ -114,6 +114,16 @@ CREATE TABLE IF NOT EXISTS password_resets (
   used_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS password_resets_email ON password_resets (email);
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id SERIAL PRIMARY KEY,
+  role TEXT NOT NULL,
+  user_id INT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS refresh_tokens_user ON refresh_tokens (role, user_id);
 CREATE TABLE IF NOT EXISTS contact_enquiries (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,

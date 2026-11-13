@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
+import { useActionState, useEffect, useTransition } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { resetPassword } from "@/lib/auth-actions";
 import { resetPasswordSchema, type ResetPasswordValues } from "@/lib/validation";
+import { notify } from "@/lib/notify";
 import { PasswordField, ReqMark } from "@/components/fields";
 import { Spinner } from "@/components/spinner";
 
@@ -23,6 +24,10 @@ export function ResetForm({ token }: { token: string }) {
 
   const busy = pending || isSubmitting;
 
+  useEffect(() => {
+    if (state.error) notify.error(state.error);
+  }, [state.error]);
+
   function onValid(data: ResetPasswordValues) {
     const fd = new FormData();
     fd.set("token", data.token);
@@ -32,11 +37,6 @@ export function ResetForm({ token }: { token: string }) {
 
   return (
     <form onSubmit={handleSubmit(onValid)} className="flex flex-col gap-3.5">
-      {state.error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-600">
-          {state.error}
-        </div>
-      )}
       <Controller
         name="password"
         control={control}

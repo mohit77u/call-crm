@@ -1,15 +1,15 @@
 import Image from "next/image";
 import { requireAdmin, hasFeature } from "@/lib/auth";
 import { SidebarLinks } from "@/components/sidebar-links";
-import { logout } from "../company/actions";
+import { logout } from "../actions";
 
 export default async function CrmLayout({ children }: LayoutProps<"/">) {
   const admin = await requireAdmin();
   const links = [
-    ...(hasFeature(admin, "reports") ? [{ href: "/dashboard", label: "Dashboard" }] : []),
-    { href: "/calls", label: "Call logs" },
-    { href: "/agents", label: "Agents" },
-    { href: "/settings", label: "Settings" },
+    ...(hasFeature(admin, "reports") ? [{ href: "/company/dashboard", label: "Dashboard" }] : []),
+    { href: "/company/calls", label: "Call logs" },
+    { href: "/company/agents", label: "Agents" },
+    { href: "/company/settings", label: "Settings" },
   ];
   return (
     <div className="shell">

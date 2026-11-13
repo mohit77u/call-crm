@@ -4,7 +4,7 @@ import { SettingsBrowser } from "./settings-browser";
 
 export const metadata = { title: "Settings" };
 
-export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
+export default async function SettingsPage({ searchParams }: PageProps<"/company/settings">) {
   await requireAdmin();
   const { welcome } = await searchParams;
   const settings = await apiFetch<{

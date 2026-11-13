@@ -1,10 +1,14 @@
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { platformLogin } from "../actions";
 import { LoginForm } from "@/components/auth/login-form";
+import { getSuperadmin } from "@/lib/auth";
 
 export const metadata = { title: "Admin login" };
 
-export default function AdminLoginPage() {
+export default async function AdminLoginPage() {
+  const admin = await getSuperadmin();
+  if (admin) redirect("/admin/dashboard");
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-5">
       <div className="w-[400px] rounded-2xl bg-white p-8 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">

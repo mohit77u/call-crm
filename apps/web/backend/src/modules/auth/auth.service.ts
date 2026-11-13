@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { AppDataSource } from "../../database";
 import { checkPassword, hashPassword } from "../../shared/password";
-import { signAdminToken, signPlatformToken } from "../../shared/jwt";
+import { signAdminToken, signPlatformToken, signRefreshToken, verifyToken, type RefreshToken } from "../../shared/jwt";
 import { config } from "../../config";
 import { mailConfigured, sendMail } from "../../shared/mail";
 import { emailShell } from "../../shared/emailTemplate";
@@ -21,8 +21,10 @@ export async function adminLogin(email: string, password: string) {
     throw unauthorized("Wrong email or password");
   }
   const token = signAdminToken({ adminId: row.admin_id, companyId: row.company_id });
+  const refreshToken = await issueSession("admin", row.admin_id);
   return {
     token,
+    refreshToken,
     admin: {
       id: row.admin_id,
       name: row.name,
@@ -42,11 +44,60 @@ export async function platformLogin(email: string, password: string) {
     throw unauthorized("Wrong email or password");
   }
   const token = signPlatformToken({ superadminId: row.id });
-  return { token, superadmin: { id: row.id, name: row.name, email: row.email } };
+  const refreshToken = await issueSession("platform", row.id);
+  return { token, refreshToken, superadmin: { id: row.id, name: row.name, email: row.email } };
 }
 
 function tokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function tokenExpiry(token: string): Date {
+  const payload = verifyToken(token) as { exp?: number } | null;
+  return payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 180 * 86400_000);
+}
+
+async function issueSession(role: "admin" | "platform", userId: number) {
+  const refreshToken = signRefreshToken({ role, userId });
+  await AppDataSource.query(
+    "INSERT INTO refresh_tokens (role, user_id, token_hash, expires_at) VALUES ($1, $2, $3, $4)",
+    [role, userId, tokenHash(refreshToken), tokenExpiry(refreshToken)],
+  );
+  return refreshToken;
+}
+
+export async function refreshSession(refreshToken: string) {
+  const payload = verifyToken<RefreshToken>(refreshToken);
+  if (!payload || payload.typ !== "refresh") throw unauthorized("Invalid session");
+
+  const rows = await AppDataSource.query(
+    "SELECT id FROM refresh_tokens WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()",
+    [tokenHash(refreshToken)],
+  );
+  if (!rows[0]) throw unauthorized("Session expired — please log in again");
+
+  // Rotate: revoke the used token, issue a fresh access + refresh pair.
+  await AppDataSource.query("UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1", [rows[0].id]);
+
+  let token: string;
+  if (payload.role === "admin") {
+    const admins = await AppDataSource.query("SELECT company_id FROM admins WHERE id = $1", [payload.userId]);
+    if (!admins[0]) throw unauthorized("Session expired — please log in again");
+    token = signAdminToken({ adminId: payload.userId, companyId: admins[0].company_id });
+  } else {
+    const platforms = await AppDataSource.query("SELECT 1 FROM superadmins WHERE id = $1", [payload.userId]);
+    if (!platforms[0]) throw unauthorized("Session expired — please log in again");
+    token = signPlatformToken({ superadminId: payload.userId });
+  }
+  const newRefreshToken = await issueSession(payload.role, payload.userId);
+  return { token, refreshToken: newRefreshToken };
+}
+
+export async function logoutSession(refreshToken: string) {
+  await AppDataSource.query(
+    "UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL",
+    [tokenHash(refreshToken)],
+  );
 }
 
 export async function requestPasswordReset(email: string) {

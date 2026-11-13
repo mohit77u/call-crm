@@ -25,7 +25,8 @@ export function ForgotForm({ loginHref }: { loginHref: string }) {
 
   useEffect(() => {
     if (state.sent) notify.success("Reset link sent — check your inbox");
-  }, [state.sent]);
+    if (state.error) notify.error(state.error);
+  }, [state.sent, state.error]);
 
   const busy = pending || isSubmitting;
 
@@ -50,11 +51,6 @@ export function ForgotForm({ loginHref }: { loginHref: string }) {
 
   return (
     <form onSubmit={handleSubmit(onValid)} className="flex flex-col gap-3.5">
-      {state.error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-600">
-          {state.error}
-        </div>
-      )}
       <p className="m-0 text-slate-500">Enter your account email. We will send a reset link.</p>
       <Controller
         name="email"
