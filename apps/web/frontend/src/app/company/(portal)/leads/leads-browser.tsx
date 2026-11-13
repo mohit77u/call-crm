@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Download, Upload, X, SlidersHorizontal } from "lucide-react";
-import { Drawer } from "@mantine/core";
+import { Download, Upload, X, SlidersHorizontal, Pencil } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { leadFormSchema, type LeadFormValues } from "@/lib/validation";
-import { LEAD_STATUSES, LEAD_STATUS_LABELS, type LeadRow } from "@/lib/leads";
+import { LEAD_STATUSES, LEAD_STATUS_LABELS, leadStatusLabel, type LeadRow } from "@/lib/leads";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Pagination } from "@/components/pagination";
 import { SearchInput } from "@/components/search-input";
@@ -27,58 +26,24 @@ function fmtDate(s: string | null) {
 
 const ALL = "__all";
 
-function EditableText({
-  value,
-  onSave,
-  className = "",
-}: {
-  value: string | null;
-  onSave: (v: string) => Promise<{ error?: string }>;
-  className?: string;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? "");
-  const [pending, startTransition] = useTransition();
+const STATUS_PILL: Record<string, string> = {
+  new: "bg-blue-100 text-blue-700",
+  contacted: "bg-cyan-100 text-cyan-700",
+  interested: "bg-violet-100 text-violet-700",
+  follow_up: "bg-amber-100 text-amber-700",
+  converted: "bg-green-100 text-green-700",
+  lost: "bg-red-100 text-red-700",
+  do_not_call: "bg-slate-200 text-slate-600",
+};
 
-  function commit() {
-    setEditing(false);
-    if (draft.trim() !== (value ?? "").trim()) {
-      startTransition(async () => {
-        const res = await onSave(draft.trim());
-        if (res?.error) notify.error(res.error);
-      });
-    }
-  }
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        disabled={pending}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          if (e.key === "Escape") {
-            setDraft(value ?? "");
-            setEditing(false);
-          }
-        }}
-        className="w-full rounded border border-[var(--primary)] bg-white px-1.5 py-0.5 text-sm text-slate-800 shadow-sm outline-none"
-      />
-    );
-  }
+function NotesCell({ notes }: { notes: string | null }) {
+  if (!notes) return <span className="text-sm text-slate-400">-</span>;
   return (
-    <span
-      onClick={() => {
-        setDraft(value ?? "");
-        setEditing(true);
-      }}
-      className={`block w-full cursor-text truncate rounded px-1 py-0.5 text-sm ${className}`}
-      title={value ?? undefined}
-    >
-      {value || <span className="text-slate-400">-</span>}
+    <span className="group relative block max-w-[240px]">
+      <span className="line-clamp-2 block text-sm text-slate-600">{notes}</span>
+      <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 whitespace-pre-wrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-normal text-white shadow-lg group-hover:block">
+        {notes}
+      </span>
     </span>
   );
 }
@@ -256,7 +221,7 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
   const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [perPage, setPerPage] = useState(10);
   const [modal, setModal] = useState<{ open: boolean; lead: LeadRow | null }>({ open: false, lead: null });
   const [importOpen, setImportOpen] = useState(false);
 
@@ -285,90 +250,100 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     return () => clearTimeout(t);
   }, [load]);
 
-  async function saveField(lead: LeadRow, patch: Parameters<typeof updateLead>[1]) {
-    const res = await updateLead(lead.id, patch);
-    if (!res.error) load();
-    return res;
-  }
-
   const columns: DataTableColumn<LeadRow>[] = [
     {
       header: "Name",
-      className: "whitespace-nowrap",
-      cell: (l) => <EditableText value={l.name} onSave={(v) => saveField(l, { name: v })} className="font-medium" />,
+      className: "min-w-[140px] whitespace-nowrap",
+      cell: (l) => <span className="text-sm font-medium">{l.name}</span>,
     },
     {
       header: "Phone",
-      className: "whitespace-nowrap",
-      cell: (l) => <EditableText value={l.phone} onSave={(v) => saveField(l, { phone: v || null })} />,
+      className: "min-w-[120px] whitespace-nowrap",
+      cell: (l) => <span className="text-sm">{l.phone || <span className="text-slate-400">-</span>}</span>,
     },
     {
       header: "Email",
-      className: "whitespace-nowrap",
-      cell: (l) => <EditableText value={l.email} onSave={(v) => saveField(l, { email: v || null })} />,
+      className: "min-w-[180px] whitespace-nowrap",
+      cell: (l) => <span className="text-sm">{l.email || <span className="text-slate-400">-</span>}</span>,
     },
     {
       header: "Agent",
-      className: "whitespace-nowrap",
-      cell: (l) => <span className="text-sm">{l.agentName ?? "-"}</span>,
+      className: "min-w-[120px] whitespace-nowrap",
+      cell: (l) => <span className="text-sm">{l.agentName ?? <span className="text-slate-400">-</span>}</span>,
     },
     {
       header: "Status",
-      className: "whitespace-nowrap",
+      className: "min-w-[120px] whitespace-nowrap",
       cell: (l) => (
-        <AppSelect
-          className="w-36"
-          value={l.status}
-          onChange={async (v) => {
-            if (!v) return;
-            const res = await updateLead(l.id, { status: v });
-            if (res.error) notify.error(res.error);
-            else load();
-          }}
-          data={LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }))}
-        />
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_PILL[l.status] ?? "bg-slate-100 text-slate-600"}`}>
+          {leadStatusLabel(l.status)}
+        </span>
       ),
     },
     {
       header: "Account created",
-      className: "whitespace-nowrap",
-      cell: (l) => (
-        <input
-          type="checkbox"
-          checked={l.accountCreated}
-          onChange={async (e) => {
-            const res = await updateLead(l.id, { accountCreated: e.target.checked });
-            if (res.error) notify.error(res.error);
-            else load();
-          }}
-          className="h-4 w-4 accent-[var(--primary)]"
-        />
-      ),
+      className: "min-w-[110px] whitespace-nowrap",
+      cell: (l) =>
+        l.accountCreated ? (
+          <span className="text-sm font-medium text-green-600">Yes</span>
+        ) : (
+          <span className="text-sm font-medium text-red-500">No</span>
+        ),
     },
     {
       header: "Notes",
-      className: "min-w-[200px]",
-      cell: (l) => (
-        <span className="line-clamp-2 block max-w-[220px] text-sm text-slate-600" title={l.notes ?? undefined}>
-          {l.notes || <span className="text-slate-400">-</span>}
-        </span>
-      ),
+      className: "min-w-[220px]",
+      cell: (l) => <NotesCell notes={l.notes} />,
     },
-    { header: "Updated", className: "whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.updatedAt)}</span> },
+    { header: "Updated", className: "min-w-[130px] whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.updatedAt)}</span> },
     {
       header: "",
-      className: "whitespace-nowrap",
+      className: "sticky right-0 z-10 min-w-[56px] border-l border-slate-200 bg-white",
       cell: (l) => (
         <button
           type="button"
           onClick={() => setModal({ open: true, lead: l })}
-          className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          aria-label="Edit lead"
+          title="Edit"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-200 text-slate-700 transition-colors hover:bg-slate-300"
         >
-          Edit
+          <Pencil size={15} strokeWidth={2.2} color="#334155" />
         </button>
       ),
     },
   ];
+
+  const appliedCount = [agentFilter, statusFilter, createdFrom, createdTo].filter(Boolean).length;
+
+  const openFilter = () => {
+    setDraftAgent(agentFilter);
+    setDraftStatus(statusFilter);
+    setDraftFrom(createdFrom);
+    setDraftTo(createdTo);
+    setFilterOpen(true);
+  };
+
+  const applyFilters = () => {
+    setAgentFilter(draftAgent);
+    setStatusFilter(draftStatus);
+    setAssignedFrom(draftFrom);
+    setAssignedTo(draftTo);
+    setPage(1);
+    setFilterOpen(false);
+  };
+
+  const clearFilters = () => {
+    setDraftAgent("");
+    setDraftStatus("");
+    setDraftFrom("");
+    setDraftTo("");
+    setAgentFilter("");
+    setStatusFilter("");
+    setAssignedFrom("");
+    setAssignedTo("");
+    setPage(1);
+    setFilterOpen(false);
+  };
 
   return (
     <>
@@ -388,19 +363,13 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
         />
         <button
           type="button"
-          onClick={() => {
-            setDraftAgent(agentFilter);
-            setDraftStatus(statusFilter);
-            setDraftFrom(createdFrom);
-            setDraftTo(createdTo);
-            setFilterOpen(true);
-          }}
-          className="relative inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          onClick={openFilter}
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
         >
           <SlidersHorizontal size={14} /> Filters
-          {(agentFilter || statusFilter || createdFrom || createdTo) && (
-            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-semibold text-white">
-              {[agentFilter, statusFilter, createdFrom, createdTo].filter(Boolean).length}
+          {appliedCount > 0 && (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">
+              {appliedCount}
             </span>
           )}
         </button>
@@ -454,7 +423,12 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
         emptyMessage="No leads yet. Add a lead or approve agent requests."
         rowKey={(l) => l.id}
         rows={data?.leads ?? []}
-        footer={data && data.total >= 10 ? (
+        columns={columns}
+      />
+      </div>
+
+      {data && data.total >= 10 && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <Pagination
             page={data.page}
             pages={data.pages}
@@ -463,10 +437,8 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
             onPage={setPage}
             onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
           />
-        ) : null}
-        columns={columns}
-      />
-      </div>
+        </div>
+      )}
 
       {modal.open && (
         <LeadFormModal
@@ -480,82 +452,60 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
         <ImportLeadsModal agents={agents} onClose={() => setImportOpen(false)} onDone={load} />
       )}
 
-      <Drawer
-        opened={filterOpen}
-        onClose={() => setFilterOpen(false)}
-        title="Filters"
-        position="right"
-        size={340}
-      >
-        <div className="flex flex-col gap-4">
-          <div>
-            <p className="mb-1.5 text-sm font-medium text-slate-700">Agent</p>
-            <AppSelect
-              value={draftAgent || ALL}
-              onChange={(v) => setDraftAgent(v === ALL ? "" : v ?? "")}
-              data={[
-                { value: ALL, label: "All agents" },
-                { value: "unassigned", label: "Not assigned" },
-                ...agents.map((a) => ({ value: String(a.id), label: a.name })),
-              ]}
-            />
-          </div>
-          <div>
-            <p className="mb-1.5 text-sm font-medium text-slate-700">Status</p>
-            <AppSelect
-              value={draftStatus || ALL}
-              onChange={(v) => setDraftStatus(v === ALL ? "" : v ?? "")}
-              data={[{ value: ALL, label: "All statuses" }, ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }))]}
-            />
-          </div>
-          <div>
-            <p className="mb-1.5 text-sm font-medium text-slate-700">Created date</p>
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={draftFrom}
-                onChange={(e) => setDraftFrom(e.target.value)}
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm text-slate-700"
-              />
-              <span className="text-sm text-slate-400">to</span>
-              <input
-                type="date"
-                value={draftTo}
-                onChange={(e) => setDraftTo(e.target.value)}
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm text-slate-700"
-              />
+      {filterOpen && (
+        <>
+          <div className="drawer-backdrop" onClick={() => setFilterOpen(false)} />
+          <aside className="drawer">
+            <div className="drawer-head">
+              <h2>Filters</h2>
+              <button type="button" className="drawer-close" onClick={() => setFilterOpen(false)}>✕</button>
             </div>
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setDraftAgent("");
-                setDraftStatus("");
-                setDraftFrom("");
-                setDraftTo("");
-              }}
-              className="inline-flex h-9 flex-1 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAgentFilter(draftAgent);
-                setStatusFilter(draftStatus);
-                setAssignedFrom(draftFrom);
-                setAssignedTo(draftTo);
-                setPage(1);
-                setFilterOpen(false);
-              }}
-              className="inline-flex h-9 flex-1 items-center justify-center rounded-md bg-[var(--primary)] px-3 text-sm font-medium text-white hover:bg-[var(--primary-dark)]"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      </Drawer>
+            <div className="drawer-body">
+              <label className="drawer-field">
+                <span>Agent</span>
+                <AppSelect
+                  value={draftAgent || ALL}
+                  onChange={(v) => setDraftAgent(v === ALL ? "" : v ?? "")}
+                  data={[
+                    { value: ALL, label: "All agents" },
+                    { value: "unassigned", label: "Not assigned" },
+                    ...agents.map((a) => ({ value: String(a.id), label: a.name })),
+                  ]}
+                />
+              </label>
+              <label className="drawer-field">
+                <span>Status</span>
+                <AppSelect
+                  value={draftStatus || ALL}
+                  onChange={(v) => setDraftStatus(v === ALL ? "" : v ?? "")}
+                  data={[{ value: ALL, label: "All statuses" }, ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }))]}
+                />
+              </label>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Created date</p>
+              <label className="drawer-field">
+                <span>From</span>
+                <input
+                  type="date"
+                  value={draftFrom}
+                  onChange={(e) => setDraftFrom(e.target.value)}
+                />
+              </label>
+              <label className="drawer-field">
+                <span>To</span>
+                <input
+                  type="date"
+                  value={draftTo}
+                  onChange={(e) => setDraftTo(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="drawer-foot">
+              <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={clearFilters}>Clear</button>
+              <button type="button" className="btn" style={{ flex: 1 }} onClick={applyFilters}>Apply</button>
+            </div>
+          </aside>
+        </>
+      )}
     </>
   );
 }

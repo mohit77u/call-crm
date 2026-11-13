@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { STATUSES, STATUS_LABELS, formatDateTime, formatDuration, todayInZone, type CallStatus } from "@/lib/calls";
 import { Pagination } from "@/components/pagination";
 import { SearchInput } from "@/components/search-input";
@@ -135,27 +136,27 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
         </div>
       </div>
 
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <SearchInput
           className="w-full max-w-xs"
           placeholder="Search"
           value={filters.q}
           onSearch={(q) => { setFilters((f) => ({ ...f, q })); setPage(1); }}
         />
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          onClick={() => { setDraft(filters); setDrawerOpen(true); }}
+        >
+          <SlidersHorizontal size={14} /> Filters
+          {appliedCount > 0 && (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">
+              {appliedCount}
+            </span>
+          )}
+        </button>
+        <div className="ml-auto flex items-center gap-2">
           {canExport && <a className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50" href={`/api/calls/export?${exportQs}`}>Export CSV</a>}
-          <button
-            type="button"
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-            onClick={() => { setDraft(filters); setDrawerOpen(true); }}
-          >
-            Filters
-            {appliedCount > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">
-                {appliedCount}
-              </span>
-            )}
-          </button>
         </div>
       </div>
 
