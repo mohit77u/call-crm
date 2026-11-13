@@ -87,7 +87,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/company/da
         <div className="page-actions">
           <div className="period-pills">
             {DAY_OPTIONS.map((d) => (
-              <Link key={d} href={`/dashboard?days=${d}`} className={`pill${d === days ? " active" : ""}`}>{d}d</Link>
+              <Link key={d} href={`/company/dashboard?days=${d}`} className={`pill${d === days ? " active" : ""}`}>{d}d</Link>
             ))}
           </div>
           {canExport && <a className="btn secondary" href={`/api/calls/export?from=${from}&to=${to}`}>Export CSV</a>}
@@ -124,7 +124,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/company/da
           <tbody>
             {data.agents.map((a) => (
               <tr key={a.id}>
-                <td><a href={`/calls?agent=${a.id}&from=${from}&to=${to}`}>{a.name}</a></td>
+                <td><a href={`/company/calls?agent=${a.id}&from=${from}&to=${to}`}>{a.name}</a></td>
                 <td>{a.total}</td><td>{a.connected}</td><td>{a.not_connected}</td><td>{a.received}</td><td>{a.missed}</td>
                 <td>{formatMinutes(a.talk_sec)}</td>
                 <td className="muted">{a.last_sync_at ? formatDateTime(a.last_sync_at) : "Never"}</td>
