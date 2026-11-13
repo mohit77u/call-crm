@@ -52,8 +52,8 @@ const STATUS_CLS: Record<string, string> = {
   other: "st-other",
 };
 
-export function CallsBrowser() {
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
+export function CallsBrowser({ initialFilters }: { initialFilters?: Partial<Filters> }) {
+  const [filters, setFilters] = useState<Filters>(() => ({ ...defaultFilters(), ...(initialFilters ?? {}) }));
   const [draft, setDraft] = useState<Filters>(filters);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);

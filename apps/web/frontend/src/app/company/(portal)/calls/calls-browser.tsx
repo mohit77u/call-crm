@@ -53,8 +53,8 @@ function statusPill(status: CallStatus) {
   return <span className={`tpill ${STATUS_CLS[status] ?? "st-other"}`}>{STATUS_LABELS[status]}</span>;
 }
 
-export function CallsBrowser({ canExport }: { canExport: boolean }) {
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
+export function CallsBrowser({ canExport, initialFilters }: { canExport: boolean; initialFilters?: Partial<Filters> }) {
+  const [filters, setFilters] = useState<Filters>(() => ({ ...defaultFilters(), ...(initialFilters ?? {}) }));
   const [draft, setDraft] = useState<Filters>(filters);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
