@@ -15,13 +15,31 @@ adminRouter.use(requireSuperadmin);
 const q = (v: unknown) => String(Array.isArray(v) ? v[0] : (v ?? "")).trim().slice(0, 60);
 const companyParam = (v: unknown) => (/^\d+$/.test(String(v ?? "")) ? String(v) : "");
 
+const adminInput = z.object({
+  name: z.string().trim().min(1).max(200),
+  email: z.string().trim().toLowerCase().email().max(200),
+  password: z.string().min(8).max(200),
+});
+
 const createCompanySchema = z.object({
   name: z.string().trim().min(1).max(200),
-  adminName: z.string().trim().min(1).max(200),
-  adminEmail: z.string().trim().toLowerCase().email().max(200),
-  adminPassword: z.string().min(8).max(200),
+  admins: z.array(adminInput).min(1).max(3),
   plan: z.string().max(30).optional(),
   features: z.record(z.union([z.boolean(), z.number(), z.null()])).optional(),
+});
+
+const updateAdminsSchema = z.object({
+  upserts: z
+    .array(
+      z.object({
+        id: z.number().int().positive().optional(),
+        name: z.string().trim().min(1).max(200),
+        email: z.string().trim().toLowerCase().email().max(200),
+        password: z.string().min(8).max(200).optional(),
+      }),
+    )
+    .max(3),
+  removeIds: z.array(z.number().int().positive()).max(3).default([]),
 });
 
 const updateCompanySchema = z.object({
@@ -95,6 +113,14 @@ adminRouter.patch(
       features: input.features,
     });
     res.json({ company });
+  }),
+);
+
+adminRouter.patch(
+  "/companies/:id/admins",
+  asyncHandler(async (req, res) => {
+    const input = parse(updateAdminsSchema, req.body);
+    res.json(await superadminService.updateAdmins(Number(req.params.id), { ...input, removeIds: input.removeIds ?? [] }));
   }),
 );
 

@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { AppDataSource } from "../../database";
 import { checkPassword, hashPassword } from "../../shared/password";
-import { signAdminToken, signPlatformToken, signRefreshToken, verifyToken, type RefreshToken } from "../../shared/jwt";
+import { signAdminToken, signAgentToken, signPlatformToken, signRefreshToken, verifyToken, type RefreshToken } from "../../shared/jwt";
 import { config } from "../../config";
+import { normalizeClientCode } from "../../shared/clientCode";
 import { mailConfigured, sendMail } from "../../shared/mail";
 import { emailShell } from "../../shared/emailTemplate";
 import { badRequest, unauthorized } from "../../shared/errors";
@@ -37,6 +38,35 @@ export async function adminLogin(email: string, password: string) {
   };
 }
 
+export async function agentLogin(clientCode: string, username: string, password: string) {
+  const rows = await AppDataSource.query(
+    `SELECT a.id AS agent_id, a.name, a.username, a.password_hash, a.active,
+            c.id AS company_id, c.name AS company_name, c.client_code, c.features
+     FROM agents a JOIN companies c ON c.id = a.company_id
+     WHERE c.client_code = $1 AND a.username = $2`,
+    [normalizeClientCode(clientCode), username.trim().toLowerCase()],
+  );
+  const row = rows[0];
+  if (!row || !row.active || !(await checkPassword(password, row.password_hash))) {
+    throw unauthorized("Wrong username or password");
+  }
+  const token = signAgentToken({ agentId: row.agent_id, companyId: row.company_id });
+  const refreshToken = await issueSession("agent", row.agent_id);
+  return {
+    token,
+    refreshToken,
+    agent: {
+      id: row.agent_id,
+      name: row.name,
+      username: row.username,
+      companyId: row.company_id,
+      companyName: row.company_name,
+      clientCode: row.client_code,
+      features: normalizeFeatures(row.features),
+    },
+  };
+}
+
 export async function platformLogin(email: string, password: string) {
   const rows = await AppDataSource.query("SELECT id, name, email, password_hash FROM superadmins WHERE email = $1", [email]);
   const row = rows[0];
@@ -57,7 +87,7 @@ function tokenExpiry(token: string): Date {
   return payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 180 * 86400_000);
 }
 
-async function issueSession(role: "admin" | "platform", userId: number) {
+async function issueSession(role: "admin" | "platform" | "agent", userId: number) {
   const refreshToken = signRefreshToken({ role, userId });
   await AppDataSource.query(
     "INSERT INTO refresh_tokens (role, user_id, token_hash, expires_at) VALUES ($1, $2, $3, $4)",
@@ -84,10 +114,14 @@ export async function refreshSession(refreshToken: string) {
     const admins = await AppDataSource.query("SELECT company_id FROM admins WHERE id = $1", [payload.userId]);
     if (!admins[0]) throw unauthorized("Session expired — please log in again");
     token = signAdminToken({ adminId: payload.userId, companyId: admins[0].company_id });
-  } else {
+  } else if (payload.role === "platform") {
     const platforms = await AppDataSource.query("SELECT 1 FROM superadmins WHERE id = $1", [payload.userId]);
     if (!platforms[0]) throw unauthorized("Session expired — please log in again");
     token = signPlatformToken({ superadminId: payload.userId });
+  } else {
+    const agents = await AppDataSource.query("SELECT company_id FROM agents WHERE id = $1 AND active", [payload.userId]);
+    if (!agents[0]) throw unauthorized("Session expired — please log in again");
+    token = signAgentToken({ agentId: payload.userId, companyId: agents[0].company_id });
   }
   const newRefreshToken = await issueSession(payload.role, payload.userId);
   return { token, refreshToken: newRefreshToken };

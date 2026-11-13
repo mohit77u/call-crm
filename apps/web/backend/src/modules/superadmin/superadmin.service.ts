@@ -3,10 +3,11 @@ import { TIME_ZONE } from "../../shared/calls";
 import { badRequest, notFound } from "../../shared/errors";
 import type { CompanyFeatures } from "../../shared/features";
 import {
-  createCompanyWithAdmin,
+  createCompanyWithAdmins,
   getOr404,
   regenerateClientCode,
   updateCompany,
+  updateCompanyAdmins,
 } from "../companies/companies.service";
 import { platformExportCallsRows, platformListCalls, type CallFilters } from "../call-logs/calls.service";
 
@@ -79,17 +80,31 @@ export async function companyDetail(id: number) {
 
 export async function createCompany(input: {
   name: string;
-  adminName: string;
-  adminEmail: string;
-  adminPassword: string;
+  admins: { name: string; email: string; password: string }[];
   plan?: string;
   features?: CompanyFeatures;
 }) {
-  const email = input.adminEmail.trim().toLowerCase();
-  const existing = await AppDataSource.query("SELECT 1 FROM admins WHERE email = $1", [email]);
-  if (existing.length > 0) throw badRequest("This email is already registered");
-  const { company, clientCode } = await createCompanyWithAdmin({ ...input, adminEmail: email });
-  return { company, clientCode, adminEmail: email };
+  const admins = input.admins.map((a) => ({
+    name: a.name.trim(),
+    email: a.email.trim().toLowerCase(),
+    password: a.password,
+  }));
+  const emails = admins.map((a) => a.email);
+  if (new Set(emails).size !== emails.length) throw badRequest("Admin emails must be unique");
+  for (const email of emails) {
+    const existing = await AppDataSource.query("SELECT 1 FROM admins WHERE email = $1", [email]);
+    if (existing.length > 0) throw badRequest("This email is already registered");
+  }
+  const { company, clientCode } = await createCompanyWithAdmins({ ...input, admins });
+  return { company, clientCode, adminEmails: emails };
+}
+
+export async function updateAdmins(id: number, input: { upserts: { id?: number; name: string; email: string; password?: string }[]; removeIds: number[] }) {
+  const admins = await updateCompanyAdmins(id, {
+    upserts: input.upserts.map((u) => ({ ...u, name: u.name.trim(), email: u.email.trim().toLowerCase() })),
+    removeIds: input.removeIds,
+  });
+  return { admins };
 }
 
 export async function deleteCompany(id: number) {

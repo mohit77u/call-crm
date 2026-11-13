@@ -22,8 +22,8 @@ export const PLANS: PlanDef[] = [
     priceMonthly: 1999,
     priceYearly: 19990,
     maxAgents: 10,
-    features: { callSync: true, locations: false, exports: false, reports: true, maxAgents: 10 },
-    highlights: ["Up to 10 agents", "Call sync & dashboard reports", "Android app access"],
+    features: { callSync: true, locations: false, exports: false, reports: true, leadManagement: true, maxAgents: 10 },
+    highlights: ["Up to 10 agents", "Call sync & dashboard reports", "Lead management", "Android app access"],
   },
   {
     slug: "pro",
@@ -32,8 +32,8 @@ export const PLANS: PlanDef[] = [
     priceMonthly: 3999,
     priceYearly: 39990,
     maxAgents: 25,
-    features: { callSync: true, locations: true, exports: true, reports: true, maxAgents: 25 },
-    highlights: ["Up to 25 agents", "Location tracking", "CSV exports", "Dashboard reports"],
+    features: { callSync: true, locations: true, exports: true, reports: true, leadManagement: true, maxAgents: 25 },
+    highlights: ["Up to 25 agents", "Location tracking", "CSV exports", "Dashboard reports", "Lead management"],
   },
   {
     slug: "enterprise",
@@ -42,8 +42,8 @@ export const PLANS: PlanDef[] = [
     priceMonthly: 5999,
     priceYearly: 59990,
     maxAgents: 50,
-    features: { callSync: true, locations: true, exports: true, reports: true, maxAgents: 50 },
-    highlights: ["Up to 50 agents", "Location tracking", "CSV exports", "Dashboard reports", "Priority support"],
+    features: { callSync: true, locations: true, exports: true, reports: true, leadManagement: true, maxAgents: 50 },
+    highlights: ["Up to 50 agents", "Location tracking", "CSV exports", "Dashboard reports", "Lead management", "Priority support"],
   },
 ];
 

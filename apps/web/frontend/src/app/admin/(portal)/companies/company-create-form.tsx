@@ -3,14 +3,17 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useFieldArray, useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus, Trash2 } from "lucide-react";
 import { createCompany } from "./actions";
 import { createCompanySchema, type CreateCompanyValues } from "@/lib/validation";
 import { PlanFields, stateFromPlan, type PlanFormState } from "./plan-fields";
 import { TextField, EmailField, PasswordField, ReqMark } from "@/components/fields";
 import { Spinner } from "@/components/spinner";
 import { notify } from "@/lib/notify";
+
+const MAX_ADMINS = 3;
 
 export function CompanyCreateForm() {
   const router = useRouter();
@@ -21,11 +24,12 @@ export function CompanyCreateForm() {
     control,
     handleSubmit,
     clearErrors,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<CreateCompanyValues>({
     resolver: zodResolver(createCompanySchema),
-    defaultValues: { name: "", adminName: "", adminEmail: "", adminPassword: "" },
+    defaultValues: { name: "", admins: [{ name: "", email: "", password: "" }] },
   });
+  const { fields, append, remove } = useFieldArray({ control, name: "admins" });
 
   const busy = pending || isSubmitting;
 
@@ -39,9 +43,7 @@ export function CompanyCreateForm() {
   function onValid(data: CreateCompanyValues) {
     const fd = new FormData();
     fd.set("name", data.name);
-    fd.set("adminName", data.adminName);
-    fd.set("adminEmail", data.adminEmail);
-    fd.set("adminPassword", data.adminPassword);
+    fd.set("admins", JSON.stringify(data.admins));
     fd.set("plan", planState.plan);
     fd.set("maxAgents", planState.maxAgents);
     for (const [key, value] of Object.entries(planState.features)) {
@@ -58,7 +60,7 @@ export function CompanyCreateForm() {
 
       <div className="border-b border-slate-200 px-5 py-3">
         <h2 className="mb-0! text-2xl! font-bold! text-slate-900">New Company</h2>
-        <p className="mt-1 text-sm text-slate-500">Create a workspace and its first admin in one go.</p>
+        <p className="mt-1 text-sm text-slate-500">Create a workspace and its admin accounts (max 3) in one go.</p>
       </div>
 
       <div className="flex flex-col gap-6 p-5">
@@ -66,75 +68,107 @@ export function CompanyCreateForm() {
           <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500">Company details</h3>
           <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Controller
-                name="name"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    {...field}
-                    label={<>Company Name<ReqMark /></>}
-                    placeholder="e.g. Acme Sales Pvt Ltd"
-                    maxLength={100}
-                    autoFocus
-                    size="sm"
-                    error={fieldState.error?.message}
-                    onClearError={() => clearErrors("name")}
-                  />
-                )}
-              />
-          </div>
-        </section>
-
-        <section className="border-t border-slate-100 pt-5">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500">Admin account</h3>
-          <p className="mt-1 text-xs text-slate-500">This person logs in to the CRM. Share the client code and these credentials with them.</p>
-          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Controller
-              name="adminName"
+              name="name"
               control={control}
               render={({ field, fieldState }) => (
                 <TextField
                   {...field}
-                  label={<>Admin Name<ReqMark /></>}
-                  placeholder="Full name"
+                  label={<>Company Name<ReqMark /></>}
+                  placeholder="e.g. Acme Sales Pvt Ltd"
                   maxLength={100}
+                  autoFocus
                   size="sm"
                   error={fieldState.error?.message}
-                  onClearError={() => clearErrors("adminName")}
+                  onClearError={() => clearErrors("name")}
                 />
               )}
             />
-            <Controller
-              name="adminEmail"
-              control={control}
-              render={({ field, fieldState }) => (
-                <EmailField
-                  {...field}
-                  label={<>Admin Email<ReqMark /></>}
-                  autoComplete="email"
-                  size="sm"
-                  error={fieldState.error?.message}
-                  onClearError={() => clearErrors("adminEmail")}
-                />
-              )}
-            />
-            <div className="sm:col-span-2">
-              <Controller
-                name="adminPassword"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <PasswordField
-                    {...field}
-                    label={<>Admin Password<ReqMark /></>}
-                    placeholder="Min. 8 characters"
-                    autoComplete="new-password"
-                    maxLength={100}
-                    size="sm"
-                    error={fieldState.error?.message}
-                    onClearError={() => clearErrors("adminPassword")}
-                  />
-                )}
-              />
+          </div>
+        </section>
+
+        <section className="border-t border-slate-100 pt-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500">Admin accounts</h3>
+              <p className="mt-1 text-xs text-slate-500">These people log in to the CRM. Up to {MAX_ADMINS} admins per company.</p>
             </div>
+            <button
+              type="button"
+              disabled={fields.length >= MAX_ADMINS}
+              onClick={() => append({ name: "", email: "", password: "" })}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Plus size={14} /> Add admin
+            </button>
+          </div>
+          {typeof errors.admins?.message === "string" && (
+            <p className="mt-2 text-xs text-red-500">{errors.admins.message}</p>
+          )}
+          <div className="mt-3 flex flex-col gap-4">
+            {fields.map((f, i) => (
+              <div key={f.id} className="rounded-lg border border-slate-200 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">Admin {i + 1}</span>
+                  {fields.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => remove(i)}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-500"
+                      aria-label="Remove admin"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Controller
+                    name={`admins.${i}.name`}
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <TextField
+                        {...field}
+                        label={<>Name<ReqMark /></>}
+                        placeholder="Full name"
+                        maxLength={100}
+                        size="sm"
+                        error={fieldState.error?.message}
+                        onClearError={() => clearErrors(`admins.${i}.name`)}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name={`admins.${i}.email`}
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <EmailField
+                        {...field}
+                        label={<>Email<ReqMark /></>}
+                        autoComplete="email"
+                        size="sm"
+                        error={fieldState.error?.message}
+                        onClearError={() => clearErrors(`admins.${i}.email`)}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name={`admins.${i}.password`}
+                    control={control}
+                    render={({ field, fieldState }) => (
+                      <PasswordField
+                        {...field}
+                        label={<>Password<ReqMark /></>}
+                        placeholder="Min. 8 characters"
+                        autoComplete="new-password"
+                        maxLength={100}
+                        size="sm"
+                        error={fieldState.error?.message}
+                        onClearError={() => clearErrors(`admins.${i}.password`)}
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 

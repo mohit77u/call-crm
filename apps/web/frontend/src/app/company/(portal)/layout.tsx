@@ -8,6 +8,12 @@ export default async function CrmLayout({ children }: LayoutProps<"/">) {
   const links = [
     ...(hasFeature(admin, "reports") ? [{ href: "/company/dashboard", label: "Dashboard" }] : []),
     { href: "/company/calls", label: "Call logs" },
+    ...(hasFeature(admin, "leadManagement")
+      ? [
+          { href: "/company/leads", label: "Leads" },
+          { href: "/company/leads/requests", label: "Lead requests" },
+        ]
+      : []),
     { href: "/company/agents", label: "Agents" },
     { href: "/company/settings", label: "Settings" },
   ];

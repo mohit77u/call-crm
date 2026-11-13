@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/calls";
 import { planDisplayName } from "@/lib/plans";
 import { CompanyEditForm } from "../company-edit-form";
 import { RegenerateCodeButton } from "../regenerate-code-button";
+import { CompanyAdminsForm } from "../company-admins-form";
 
 export const metadata = { title: "Company details" };
 
@@ -63,22 +64,7 @@ export default async function CompanyDetailPage({ params }: PageProps<"/admin/co
         </div>
       </div>
 
-      <div className="card">
-        <h2>Admins</h2>
-        <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Created</th></tr></thead>
-          <tbody>
-            {admins.map((a) => (
-              <tr key={a.id}>
-                <td>{a.name}</td>
-                <td>{a.email}</td>
-                <td className="muted">{formatDateTime(a.createdAt)}</td>
-              </tr>
-            ))}
-            {admins.length === 0 && <tr><td colSpan={3} className="muted">No admins.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <CompanyAdminsForm companyId={company.id} admins={admins} />
     </>
   );
 }

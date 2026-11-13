@@ -11,6 +11,7 @@ import { callsRouter, dashboardRouter } from "./modules/call-logs/calls.controll
 import { settingsRouter } from "./modules/settings/settings.controller";
 import { adminRouter } from "./modules/superadmin/superadmin.controller";
 import { contactRouter } from "./modules/contact/contact.controller";
+import { agentLeadsRouter, crmLeadsRouter } from "./modules/leads/leads.controller";
 
 export function createApp() {
   const app = express();
@@ -37,6 +38,8 @@ export function createApp() {
   app.use("/api/crm/calls", callsRouter);
   app.use("/api/crm/dashboard", dashboardRouter);
   app.use("/api/crm/settings", settingsRouter);
+  app.use("/api/crm/leads", crmLeadsRouter);
+  app.use("/api/agent/leads", agentLeadsRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/contact", contactRouter);
 

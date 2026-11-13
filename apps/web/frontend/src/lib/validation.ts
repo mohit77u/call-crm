@@ -28,14 +28,56 @@ export const loginFormSchema = z.object({ email: emailSchema, password: password
 export const forgotPasswordSchema = z.object({ email: emailSchema });
 export const resetPasswordSchema = z.object({ token: z.string(), password: newPasswordSchema });
 
-export const createCompanySchema = z.object({
-  name: z.string().trim().min(1, "Company Name is required").max(100, "Company Name must be 100 characters or less"),
-  adminName: z.string().trim().min(1, "Admin Name is required").max(100, "Admin Name must be 100 characters or less"),
-  adminEmail: emailSchema.max(200, "Email must be 200 characters or less"),
-  adminPassword: z
+const adminRowSchema = z.object({
+  name: z.string().trim().min(1, "Admin Name is required").max(100, "Admin Name must be 100 characters or less"),
+  email: emailSchema.max(200, "Email must be 200 characters or less"),
+  password: z
     .string()
     .min(8, "Admin Password must be at least 8 characters")
-    .max(100, "Admin Password must be 100 characters or less"),
+    .max(100, "Admin Password must be 100 characters or less")
+    .or(z.literal("")),
+});
+
+export const createCompanySchema = z.object({
+  name: z.string().trim().min(1, "Company Name is required").max(100, "Company Name must be 100 characters or less"),
+  admins: z.array(adminRowSchema).min(1, "At least one admin is required").max(3, "Maximum 3 admins allowed"),
+});
+
+export const agentLoginSchema = z.object({
+  clientCode: z.string().trim().min(1, "Client code is required").max(50),
+  username: z.string().trim().min(1, "Username is required").max(100),
+  password: z.string().min(1, "Password is required"),
+});
+
+const indianPhone = z
+  .string()
+  .trim()
+  .max(20, "Phone must be 20 characters or less")
+  .refine(
+    (v) => {
+      if (!v) return true;
+      const d = v.replace(/\D/g, "");
+      const n = d.length === 12 && d.startsWith("91") ? d.slice(2) : d.length === 11 && d.startsWith("0") ? d.slice(1) : d;
+      return /^[6-9]\d{9}$/.test(n);
+    },
+    "Enter a valid 10-digit Indian phone number",
+  )
+  .optional();
+
+export const leadRequestSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  phone: indianPhone,
+  email: z.string().trim().email("Enter a valid email").max(200).or(z.literal("")).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
+
+export const leadFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  phone: indianPhone,
+  email: z.string().trim().email("Enter a valid email").max(200).or(z.literal("")).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  status: z.string().optional(),
+  assignedAgentId: z.string().optional(),
 });
 
 export const createAgentSchema = z.object({
@@ -57,5 +99,8 @@ export type LoginFormValues = z.infer<typeof loginFormSchema>;
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 export type CreateCompanyValues = z.infer<typeof createCompanySchema>;
+export type AgentLoginValues = z.infer<typeof agentLoginSchema>;
+export type LeadRequestValues = z.infer<typeof leadRequestSchema>;
+export type LeadFormValues = z.infer<typeof leadFormSchema>;
 export type CreateAgentValues = z.infer<typeof createAgentSchema>;
 export type ResetAgentPasswordValues = z.infer<typeof resetAgentPasswordSchema>;

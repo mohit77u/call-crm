@@ -9,9 +9,16 @@ export type CompanyFormState = { error?: string; companyId?: number };
 export async function createCompany(_prev: CompanyFormState, form: FormData): Promise<CompanyFormState> {
   await requireSuperadmin();
   const name = String(form.get("name") ?? "").trim();
-  const adminName = String(form.get("adminName") ?? "").trim();
-  const adminEmail = String(form.get("adminEmail") ?? "").trim().toLowerCase();
-  const adminPassword = String(form.get("adminPassword") ?? "");
+  let admins: { name: string; email: string; password: string }[] = [];
+  try {
+    admins = JSON.parse(String(form.get("admins") ?? "[]")) as typeof admins;
+  } catch {
+    return { error: "Invalid admin data" };
+  }
+  admins = admins
+    .map((a) => ({ name: String(a.name ?? "").trim(), email: String(a.email ?? "").trim().toLowerCase(), password: String(a.password ?? "") }))
+    .filter((a) => a.name || a.email || a.password);
+  if (admins.length < 1 || admins.length > 3) return { error: "Add between 1 and 3 admins" };
 
   const features: Record<string, boolean | number | null> = {};
   for (const key of Object.keys(FEATURE_DEFS) as FeatureKey[]) {
@@ -24,9 +31,7 @@ export async function createCompany(_prev: CompanyFormState, form: FormData): Pr
     const res = await apiFetch<{ company: { id: number } }>("/api/admin/companies", {
       body: {
         name,
-        adminName,
-        adminEmail,
-        adminPassword,
+        admins,
         plan: String(form.get("plan") ?? ""),
         features,
       },
@@ -35,6 +40,23 @@ export async function createCompany(_prev: CompanyFormState, form: FormData): Pr
     return { companyId: res.company.id };
   } catch (e) {
     return { error: e instanceof ApiError ? e.message : "Could not create company" };
+  }
+}
+
+export async function updateCompanyAdmins(
+  id: number,
+  input: { upserts: { id?: number; name: string; email: string; password?: string }[]; removeIds: number[] },
+): Promise<CompanyActionState> {
+  await requireSuperadmin();
+  try {
+    await apiFetch(`/api/admin/companies/${id}/admins`, {
+      method: "PATCH",
+      body: input,
+      token: await getPlatformToken(),
+    });
+    return { notice: "Admins updated" };
+  } catch (e) {
+    return { error: e instanceof ApiError ? e.message : "Could not update admins" };
   }
 }
 

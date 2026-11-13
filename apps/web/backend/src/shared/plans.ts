@@ -38,9 +38,10 @@ export const PLANS: Record<PlanSlug, PlanDef> = {
       locations: false,
       exports: false,
       reports: true,
+      leadManagement: true,
       maxAgents: 10,
     },
-    highlights: ["Up to 10 agents", "Call sync & dashboard reports", "Android app access"],
+    highlights: ["Up to 10 agents", "Call sync & dashboard reports", "Lead management", "Android app access"],
   },
   pro: {
     slug: "pro",
@@ -50,7 +51,7 @@ export const PLANS: Record<PlanSlug, PlanDef> = {
     priceYearly: 39990,
     maxAgents: 25,
     features: { ...allFeatures(), maxAgents: 25 },
-    highlights: ["Up to 25 agents", "Location tracking", "CSV exports", "Dashboard reports"],
+    highlights: ["Up to 25 agents", "Location tracking", "CSV exports", "Dashboard reports", "Lead management"],
   },
   enterprise: {
     slug: "enterprise",
@@ -60,7 +61,7 @@ export const PLANS: Record<PlanSlug, PlanDef> = {
     priceYearly: 59990,
     maxAgents: 50,
     features: { ...allFeatures(), maxAgents: 50 },
-    highlights: ["Up to 50 agents", "Location tracking", "CSV exports", "Dashboard reports", "Priority support"],
+    highlights: ["Up to 50 agents", "Location tracking", "CSV exports", "Dashboard reports", "Lead management", "Priority support"],
   },
 };
 

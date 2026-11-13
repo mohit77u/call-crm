@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AppDataSource } from "../database";
-import { verifyToken, type AdminToken, type AppToken, type PlatformToken } from "../shared/jwt";
+import { verifyToken, type AdminToken, type AgentToken, type AppToken, type PlatformToken } from "../shared/jwt";
 import { asyncHandler, forbidden, unauthorized } from "../shared/errors";
 import { hasFeature, type FeatureKey } from "../shared/features";
 
@@ -15,6 +15,16 @@ export type AdminContext = {
 };
 
 export type PlatformContext = { superadminId: number; name: string; email: string };
+
+export type AgentContext = {
+  agentId: number;
+  name: string;
+  username: string;
+  companyId: number;
+  companyName: string;
+  clientCode: string;
+  features: Record<string, unknown>;
+};
 
 export type AppContext = {
   deviceId: number;
@@ -33,6 +43,7 @@ declare global {
       admin?: AdminContext;
       platform?: PlatformContext;
       appSession?: AppContext;
+      agent?: AgentContext;
     }
   }
 }
@@ -102,11 +113,35 @@ export const requireAppDevice = asyncHandler(async (req: Request, _res: Response
   next();
 });
 
+export const requireAgent = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
+  const payload = bearerToken(req) ? verifyToken<AgentToken>(bearerToken(req)!) : null;
+  if (!payload || payload.typ !== "agent") throw unauthorized();
+  const rows = await AppDataSource.query(
+    `SELECT a.id AS agent_id, a.name, a.username,
+            c.id AS company_id, c.name AS company_name, c.client_code, c.features
+     FROM agents a JOIN companies c ON c.id = a.company_id
+     WHERE a.id = $1 AND a.company_id = $2 AND a.active`,
+    [payload.agentId, payload.companyId],
+  );
+  const row = rows[0];
+  if (!row) throw unauthorized();
+  req.agent = {
+    agentId: row.agent_id,
+    name: row.name,
+    username: row.username,
+    companyId: row.company_id,
+    companyName: row.company_name,
+    clientCode: row.client_code,
+    features: row.features ?? {},
+  };
+  next();
+});
+
 // Gate an endpoint behind a per-company feature flag.
 // Works for both CRM admin sessions and mobile app sessions.
 export function requireFeature(key: FeatureKey) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const features = req.admin?.features ?? req.appSession?.features;
+    const features = req.admin?.features ?? req.agent?.features ?? req.appSession?.features;
     if (!hasFeature({ features }, key)) {
       return next(forbidden(`Feature '${key}' is not enabled for this company`));
     }

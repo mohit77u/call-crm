@@ -4,6 +4,7 @@ export const FEATURE_DEFS = {
   locations: { label: "Location Tracking", description: "Store last known device location from heartbeats" },
   exports: { label: "CSV Exports", description: "Export call logs, agents and companies as CSV" },
   reports: { label: "Reports & Dashboard", description: "Dashboard stats and call analytics" },
+  leadManagement: { label: "Lead Management", description: "Agent lead requests, assignment and lead tracking" },
 } as const;
 
 export type FeatureKey = keyof typeof FEATURE_DEFS;

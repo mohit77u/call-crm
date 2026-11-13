@@ -9,12 +9,14 @@ const API_URL = (process.env.API_URL ?? "http://localhost:4000").replace(/\/$/, 
 const PORTALS = {
   admin: { access: "crm_platform", refresh: "crm_platform_refresh" },
   company: { access: "crm_session", refresh: "crm_session_refresh" },
+  agent: { access: "crm_agent_session", refresh: "crm_agent_session_refresh" },
 } as const;
 
 type Portal = keyof typeof PORTALS;
 
 function portalFor(pathname: string): Portal | null {
   if (pathname.startsWith("/admin")) return "admin";
+  if (pathname.startsWith("/agent") || pathname.startsWith("/api/agent")) return "agent";
   if (pathname.startsWith("/company") || pathname.startsWith("/api/crm") || pathname.startsWith("/api/calls")) {
     return "company";
   }
@@ -32,7 +34,8 @@ function jwtExpMs(token: string): number {
 }
 
 const isApi = (pathname: string) => pathname.startsWith("/api/");
-const loginPath = (portal: Portal) => (portal === "admin" ? "/admin/login" : "/company/login");
+const loginPath = (portal: Portal) =>
+  portal === "admin" ? "/admin/login" : portal === "agent" ? "/agent/login" : "/company/login";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -90,5 +93,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/company/:path*", "/api/admin/:path*", "/api/crm/:path*", "/api/calls/:path*"],
+  matcher: ["/admin/:path*", "/company/:path*", "/agent/:path*", "/api/admin/:path*", "/api/crm/:path*", "/api/calls/:path*", "/api/agent/:path*"],
 };

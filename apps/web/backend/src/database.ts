@@ -10,11 +10,12 @@ import { CallLog } from "./modules/call-logs/call-log.entity";
 import { Superadmin } from "./modules/superadmin/superadmin.entity";
 import { PasswordReset } from "./modules/password-resets/password-reset.entity";
 import { ContactEnquiry } from "./modules/contact/contact-enquiry.entity";
+import { Lead } from "./modules/leads/lead.entity";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: config.databaseUrl,
-  entities: [Company, Admin, Agent, Device, CallLog, Superadmin, PasswordReset, ContactEnquiry],
+  entities: [Company, Admin, Agent, Device, CallLog, Superadmin, PasswordReset, ContactEnquiry, Lead],
   synchronize: false,
   // TypeORM/pg pool tuning — keep connections bounded for low-traffic deploys.
   extra: {
@@ -25,7 +26,7 @@ export const AppDataSource = new DataSource({
   logging: false,
 });
 
-const DEFAULT_FEATURES = `{"callSync":true,"locations":true,"exports":true,"reports":true,"maxAgents":null}`;
+const DEFAULT_FEATURES = `{"callSync":true,"locations":true,"exports":true,"reports":true,"leadManagement":true,"maxAgents":null}`;
 
 const schema = `
 CREATE TABLE IF NOT EXISTS companies (
@@ -38,6 +39,7 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS features JSONB;
 UPDATE companies SET features = '${DEFAULT_FEATURES}'::jsonb WHERE features IS NULL;
 ALTER TABLE companies ALTER COLUMN features SET DEFAULT '${DEFAULT_FEATURES}'::jsonb;
 ALTER TABLE companies ALTER COLUMN features SET NOT NULL;
+UPDATE companies SET features = features || '{"leadManagement":true}'::jsonb WHERE NOT (features ? 'leadManagement');
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS plan TEXT;
 CREATE TABLE IF NOT EXISTS admins (
   id SERIAL PRIMARY KEY,
@@ -133,6 +135,30 @@ CREATE TABLE IF NOT EXISTS contact_enquiries (
   message TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS leads (
+  id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  assigned_agent_id INT REFERENCES agents(id) ON DELETE SET NULL,
+  requested_by_agent_id INT REFERENCES agents(id) ON DELETE SET NULL,
+  created_by_type TEXT NOT NULL,
+  created_by_id INT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'request',
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  account_created BOOLEAN NOT NULL DEFAULT false,
+  request_status TEXT,
+  assigned_at TIMESTAMPTZ,
+  last_contacted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS leads_company ON leads (company_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS leads_agent ON leads (assigned_agent_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS leads_request ON leads (company_id, request_status) WHERE request_status IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS leads_company_phone ON leads (company_id, phone) WHERE phone IS NOT NULL AND phone <> '';
 `;
 
 // TypeORM's query() returns [rows, affectedCount] for UPDATE/DELETE but a plain
