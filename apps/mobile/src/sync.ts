@@ -21,9 +21,6 @@ function istWorkWindowMs(): { startMs: number; endMs: number } {
   };
 }
 
-export type SimDebug = { id: number; iccId: string | null; slotIndex: number; label: string | null; accountIds: string[] };
-export type SimStat = { value: string; count: number; sim: string | null };
-
 export type SyncResult =
   | {
       ok: true;
@@ -31,9 +28,6 @@ export type SyncResult =
       requested?: boolean;
       skipped?: number;
       fallbackSent?: number;
-      simStats?: SimStat[];
-      simsInfo?: SimDebug[];
-      scanned?: number;
     }
   | { ok: false; reason: 'logged_out' | 'no_permission' | 'sim_unavailable' | 'error'; message?: string };
 
@@ -172,26 +166,14 @@ async function doSync(): Promise<SyncResult> {
 
     let uploaded = 0;
     let skipped = 0;
-    let scanned = 0;
     let fallbackSent = 0;
-    // Per distinct PHONE_ACCOUNT_ID value: how many calls and which SIM they
-    // resolved to (null = no SIM matched). Surfaced in the UI for OEM diagnosis.
-    const simStats = new Map<string, { count: number; sim: string | null }>();
     let since = session.syncFrom;
     let sinceId: string | null = session.syncFromId ?? null;
     const { startMs, endMs } = istWorkWindowMs();
     for (;;) {
       const calls = await CallLog.getCallsSince(since, sinceId, BATCH);
       if (calls.length === 0) break;
-      scanned += calls.length;
       const resolved = calls.map((c) => ({ call: c, sim: findSimForCall(simsWithIds, c) }));
-      for (const r of resolved) {
-        if (simStats.size >= 15 && !simStats.has(r.call.sim?.trim() || 'null')) continue;
-        const key = r.call.sim?.trim() || 'null';
-        const st = simStats.get(key) ?? { count: 0, sim: r.sim ? (r.sim.label ?? `id=${r.sim.id}`) : null };
-        st.count += 1;
-        simStats.set(key, st);
-      }
       // session.simValues → user-picked raw PHONE_ACCOUNT_ID groups (fallback
       // for OEMs where SIM identifiers can't be resolved, e.g. Xiaomi/ICCID).
       const rawValues = session.simValues?.length ? new Set(session.simValues) : null;
@@ -226,18 +208,7 @@ async function doSync(): Promise<SyncResult> {
       uploaded,
       requested,
       skipped,
-      scanned,
       fallbackSent: fallbackSent || undefined,
-      simStats: simStats.size
-        ? [...simStats.entries()].map(([value, s]) => ({ value, count: s.count, sim: s.sim }))
-        : undefined,
-      simsInfo: pool.map((s) => ({
-        id: s.id,
-        iccId: s.iccId,
-        slotIndex: s.slotIndex,
-        label: s.label,
-        accountIds: s.accountIds ?? [],
-      })),
     };
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {

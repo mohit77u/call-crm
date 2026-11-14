@@ -183,24 +183,7 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
           : result.skipped
             ? 'No new calls on the selected SIM'
             : 'Up to date';
-      const lines = [base];
-      if (result.fallbackSent) lines.push(`${result.fallbackSent} unattributed calls sent (SIM could not be identified)`);
-      if (result.scanned) lines.push(`Calls scanned: ${result.scanned}`);
-      if (result.simStats?.length) {
-        lines.push('SIM ids seen in call log:');
-        for (const s of result.simStats.slice(0, 8)) {
-          const v = s.value.length > 32 ? `${s.value.slice(0, 32)}…` : s.value;
-          lines.push(`  "${v}" ×${s.count} → ${s.sim ?? 'NO MATCH'}`);
-        }
-      }
-      if (result.simsInfo?.length) {
-        lines.push(
-          `Device SIMs: ${result.simsInfo
-            .map((s) => `id=${s.id} slot=${s.slotIndex}${s.iccId ? ` icc=${s.iccId.slice(0, 12)}…` : ''}${s.accountIds.length ? ` acc=${s.accountIds.join('/')}` : ''}`)
-            .join(' | ')}`
-        );
-      }
-      setMessage(lines.join('\n'));
+      setMessage(result.fallbackSent ? `${base}\n${result.fallbackSent} unattributed calls sent (SIM could not be identified)` : base);
     }
     else if (result.reason === 'logged_out') onLoggedOut();
     else if (result.reason === 'no_permission') setMessage('Call log permission is needed');
@@ -448,7 +431,7 @@ function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone:
       {groups.length > 0 && (
         <>
           <Text style={[styles.muted, { marginTop: 16, textAlign: 'center' }]}>
-            Calls found that don't match the SIMs above — pick the group used for work calls:
+            Calls found that don’t match the SIMs above — pick the group used for work calls:
           </Text>
           {groups.map((g) => (
             <Button
