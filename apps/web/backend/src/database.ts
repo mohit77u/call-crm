@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS call_logs (
 CREATE INDEX IF NOT EXISTS call_logs_company_started ON call_logs (company_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS call_logs_agent_started ON call_logs (agent_id, started_at DESC);
 ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS sim_details JSONB;
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS raw_data JSONB;
 CREATE TABLE IF NOT EXISTS superadmins (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,

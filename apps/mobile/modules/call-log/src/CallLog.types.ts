@@ -8,6 +8,7 @@ export type DeviceCall = {
   timestamp: number;
   durationSec: number;
   sim: string | null;
+  accountComponent?: string | null;
 };
 
 export type SimInfo = {

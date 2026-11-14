@@ -89,10 +89,11 @@ class CallLogModule : Module() {
       }
     }
 
-    // Returns every call after sinceMs — SIM attribution is done in JS because
-    // PHONE_ACCOUNT_ID is unreliable across OEMs (null, ICCID, subscription id,
-    // or phone-account id depending on the device).
-    AsyncFunction("getCallsSince") { sinceMs: Double, limit: Int ->
+    // Returns every call after (sinceMs, sinceId) — SIM attribution is done in JS
+    // because PHONE_ACCOUNT_ID is unreliable across OEMs (null, ICCID, subscription
+    // id, or phone-account id depending on the device). The _ID tiebreak prevents
+    // skipping calls that share the same millisecond timestamp as the cursor.
+    AsyncFunction("getCallsSince") { sinceMs: Double, sinceId: String?, limit: Int ->
       if (!hasPermission()) throw CallLogPermissionException()
       val context = appContext.reactContext ?: throw CodedException("React context is not available")
       val projection = arrayOf(
@@ -103,16 +104,24 @@ class CallLogModule : Module() {
         CallLog.Calls.DATE,
         CallLog.Calls.DURATION,
         CallLog.Calls.PHONE_ACCOUNT_ID,
+        CallLog.Calls.PHONE_ACCOUNT_COMPONENT_NAME,
       )
-      val selection = "${CallLog.Calls.DATE} > ?"
-      val selectionArgs = arrayOf(sinceMs.toLong().toString())
+      val selection: String
+      val selectionArgs: Array<String>
+      if (sinceId != null) {
+        selection = "(${CallLog.Calls.DATE} > ? OR (${CallLog.Calls.DATE} = ? AND ${CallLog.Calls._ID} > ?))"
+        selectionArgs = arrayOf(sinceMs.toLong().toString(), sinceMs.toLong().toString(), sinceId)
+      } else {
+        selection = "${CallLog.Calls.DATE} > ?"
+        selectionArgs = arrayOf(sinceMs.toLong().toString())
+      }
       val calls = mutableListOf<Map<String, Any?>>()
       context.contentResolver.query(
         CallLog.Calls.CONTENT_URI,
         projection,
         selection,
         selectionArgs,
-        "${CallLog.Calls.DATE} ASC",
+        "${CallLog.Calls.DATE} ASC, ${CallLog.Calls._ID} ASC",
       )?.use { cursor ->
         val idIdx = cursor.getColumnIndexOrThrow(CallLog.Calls._ID)
         val numberIdx = cursor.getColumnIndexOrThrow(CallLog.Calls.NUMBER)
@@ -121,6 +130,7 @@ class CallLogModule : Module() {
         val dateIdx = cursor.getColumnIndexOrThrow(CallLog.Calls.DATE)
         val durationIdx = cursor.getColumnIndexOrThrow(CallLog.Calls.DURATION)
         val simIdx = cursor.getColumnIndexOrThrow(CallLog.Calls.PHONE_ACCOUNT_ID)
+        val accountComponentIdx = cursor.getColumnIndexOrThrow(CallLog.Calls.PHONE_ACCOUNT_COMPONENT_NAME)
         while (cursor.moveToNext() && calls.size < limit) {
           calls.add(
             mapOf(
@@ -131,6 +141,7 @@ class CallLogModule : Module() {
               "timestamp" to cursor.getLong(dateIdx).toDouble(),
               "durationSec" to cursor.getLong(durationIdx).toInt(),
               "sim" to cursor.getString(simIdx),
+              "accountComponent" to cursor.getString(accountComponentIdx),
             )
           )
         }
@@ -142,8 +153,23 @@ class CallLogModule : Module() {
   private fun simIccId(context: Context, subId: Int): String? {
     return try {
       val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager ?: return null
-      val tel = if (Build.VERSION.SDK_INT >= 29 && subId >= 0) tm.createForSubscriptionId(subId) else tm
-      tel.simSerialNumber?.takeIf { it.isNotBlank() }
+      // Try the per-subscription TelephonyManager first, then the default one —
+      // some OEM builds only populate the ICCID on one of them.
+      val candidates = mutableListOf<TelephonyManager>()
+      if (Build.VERSION.SDK_INT >= 29 && subId >= 0) {
+        try {
+          candidates.add(tm.createForSubscriptionId(subId))
+        } catch (e: Exception) {
+        }
+      }
+      candidates.add(tm)
+      candidates.firstNotNullOfOrNull { tel ->
+        try {
+          tel.simSerialNumber?.takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+          null
+        }
+      }
     } catch (e: Exception) {
       null
     }

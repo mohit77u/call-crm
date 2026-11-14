@@ -1,7 +1,7 @@
 import CallLog from '../modules/call-log';
 import type { DeviceCall, SimInfo } from '../modules/call-log';
 import { ApiError, heartbeat, uploadCalls } from './api';
-import { clearSession, getSession, saveSession, setLastSyncAt, type SessionSim } from './storage';
+import { clearSession, getSession, getSimIdMap, saveSession, saveSimIdMap, setLastSyncAt, type SessionSim, type StoredSim } from './storage';
 
 const BATCH = 200;
 
@@ -21,8 +21,20 @@ function istWorkWindowMs(): { startMs: number; endMs: number } {
   };
 }
 
+export type SimDebug = { id: number; iccId: string | null; slotIndex: number; label: string | null; accountIds: string[] };
+export type SimStat = { value: string; count: number; sim: string | null };
+
 export type SyncResult =
-  | { ok: true; uploaded: number; requested?: boolean; skipped?: number }
+  | {
+      ok: true;
+      uploaded: number;
+      requested?: boolean;
+      skipped?: number;
+      fallbackSent?: number;
+      simStats?: SimStat[];
+      simsInfo?: SimDebug[];
+      scanned?: number;
+    }
   | { ok: false; reason: 'logged_out' | 'no_permission' | 'sim_unavailable' | 'error'; message?: string };
 
 let running: Promise<SyncResult> | null = null;
@@ -44,7 +56,7 @@ async function resolveSelectedSim(sims: SimInfo[], sessionSim: SessionSim): Prom
 
 // Every identifier the call log's PHONE_ACCOUNT_ID might contain for this SIM:
 // subscription id, ICCID, and any telecom phone-account ids resolved natively.
-function simIdentifiers(sim: SimInfo): Set<string> {
+export function simIdentifiers(sim: SimInfo): Set<string> {
   const ids = new Set<string>([String(sim.id)]);
   if (sim.iccId) ids.add(sim.iccId);
   for (const a of sim.accountIds ?? []) ids.add(a);
@@ -56,7 +68,7 @@ function simIdentifiers(sim: SimInfo): Set<string> {
 // ICCID embedded with extra chars (some Samsung), SIM slot index (some OEMs),
 // or null. Matching tiers: exact id → long-id substring → slot index →
 // single-SIM fallback.
-function findSimForCall(simsWithIds: { sim: SimInfo; ids: Set<string> }[], call: DeviceCall): SimInfo | null {
+export function findSimForCall(simsWithIds: { sim: SimInfo; ids: Set<string> }[], call: DeviceCall): SimInfo | null {
   const v = call.sim?.trim();
   if (!v) return simsWithIds.length === 1 ? simsWithIds[0].sim : null;
   const exact = simsWithIds.find((x) => x.ids.has(v));
@@ -68,8 +80,34 @@ function findSimForCall(simsWithIds: { sim: SimInfo; ids: Set<string> }[], call:
     [...x.ids].some((id) => id.length >= 10 && (v.includes(id) || (v.length >= 10 && id.includes(v))))
   );
   if (embedded) return embedded.sim;
-  const bySlot = simsWithIds.find((x) => String(x.sim.slotIndex) === v);
+  const bySlot = simsWithIds.find((x) => String(x.sim.slotIndex) === v || String(x.sim.slotIndex + 1) === v);
   return bySlot?.sim ?? (simsWithIds.length === 1 ? simsWithIds[0].sim : null);
+}
+
+// Rebuild a SimInfo from the identifiers saved at SIM-selection time. Used when
+// listSims() comes back empty (READ_PHONE_STATE denied or OEM hides subscription
+// info) so PHONE_ACCOUNT_ID matching can still resolve the selected SIM.
+function simFromSession(s: SessionSim): SimInfo {
+  return { id: s.subId, iccId: s.iccId, label: s.label, number: null, slotIndex: s.slotIndex ?? -1 };
+}
+
+// Merge identifiers learned on previous syncs into the live SIM list. Live and
+// stored entries are matched by subscription id or ICCID (both stable per
+// physical SIM); stored SIMs that are no longer active are kept so their
+// historical calls still attribute to the right SIM.
+function mergeStoredSims(live: SimInfo[], stored: StoredSim[]): SimInfo[] {
+  const merged = live.map((s) => {
+    const st = stored.find((x) => (s.iccId && x.iccId === s.iccId) || x.id === s.id);
+    if (!st) return s;
+    return {
+      ...s,
+      iccId: s.iccId ?? st.iccId,
+      accountIds: [...new Set([...(s.accountIds ?? []), ...(st.accountIds ?? [])])],
+    };
+  });
+  const known = new Set(merged.flatMap((s) => [String(s.id), s.iccId].filter(Boolean) as string[]));
+  const extra = stored.filter((x) => !known.has(String(x.id)) && !(x.iccId && known.has(x.iccId)));
+  return [...merged, ...extra];
 }
 
 function simDetailsOf(sim: SimInfo): Record<string, unknown> {
@@ -100,43 +138,107 @@ async function doSync(): Promise<SyncResult> {
       requested = true;
     }
     if (!permissionsOk) return { ok: false, reason: 'no_permission' };
-    if (!session.sim && !session.simAll) return { ok: true, uploaded: 0 };
+    if (!session.sim && !session.simAll && !session.simValues?.length) return { ok: true, uploaded: 0 };
 
     // simAll → sync call logs from every SIM (no SIM filter).
     // With a selected SIM we fetch all calls and attribute each one in JS —
     // PHONE_ACCOUNT_ID is unreliable across OEMs, so SQL-side filtering missed
     // calls on devices (e.g. Xiaomi) that store a different identifier or null.
     const { sims } = await CallLog.listSims().catch(() => ({ sims: [] as SimInfo[], slotCount: 0 }));
-    const simsWithIds = sims.map((s) => ({ sim: s, ids: simIdentifiers(s) }));
+    const storedSims = await getSimIdMap().catch(() => [] as StoredSim[]);
+    // Union of live SIMs (enriched with stored identifiers) and SIMs seen on
+    // previous syncs — covers listSims() returning empty or partial data.
+    const attributionSims = mergeStoredSims(sims, storedSims);
+    const pool = attributionSims.length > 0 ? attributionSims : session.sim ? [simFromSession(session.sim)] : [];
+    const simsWithIds = pool.map((s) => ({ sim: s, ids: simIdentifiers(s) }));
+    // Persist every identifier we know — once an ICCID/subId is learned it
+    // survives logouts, reboots and OEM resolution failures.
+    saveSimIdMap(pool).catch(() => {});
     let selectedSim: SimInfo | null = null;
     if (session.sim) {
-      selectedSim = await resolveSelectedSim(sims, session.sim);
+      selectedSim = await resolveSelectedSim(pool, session.sim);
       if (!selectedSim) {
         return { ok: false, reason: 'sim_unavailable', message: 'Selected SIM is not active. Please select the correct work SIM.' };
+      }
+      // Merge identifiers saved at SIM-selection time into the live SIM's
+      // identifier set — e.g. Xiaomi stores the ICCID in PHONE_ACCOUNT_ID, and
+      // the ICCID captured during selection still identifies the SIM even when
+      // listSims() can no longer resolve it on this sync.
+      if (session.sim.iccId) {
+        const entry = simsWithIds.find((x) => x.sim === selectedSim);
+        if (entry && !entry.ids.has(session.sim.iccId)) entry.ids.add(session.sim.iccId);
       }
     }
 
     let uploaded = 0;
     let skipped = 0;
+    let scanned = 0;
+    let fallbackSent = 0;
+    // Per distinct PHONE_ACCOUNT_ID value: how many calls and which SIM they
+    // resolved to (null = no SIM matched). Surfaced in the UI for OEM diagnosis.
+    const simStats = new Map<string, { count: number; sim: string | null }>();
     let since = session.syncFrom;
+    let sinceId: string | null = session.syncFromId ?? null;
     const { startMs, endMs } = istWorkWindowMs();
     for (;;) {
-      const calls = await CallLog.getCallsSince(since, BATCH);
+      const calls = await CallLog.getCallsSince(since, sinceId, BATCH);
       if (calls.length === 0) break;
+      scanned += calls.length;
       const resolved = calls.map((c) => ({ call: c, sim: findSimForCall(simsWithIds, c) }));
-      const matched = selectedSim ? resolved.filter((r) => r.sim === selectedSim) : resolved;
-      skipped += calls.length - matched.length;
-      const inWindow = matched
-        .filter((r) => r.call.timestamp >= startMs && r.call.timestamp < endMs)
-        .map((r) => ({ ...r.call, simDetails: r.sim ? simDetailsOf(r.sim) : null }));
+      for (const r of resolved) {
+        if (simStats.size >= 15 && !simStats.has(r.call.sim?.trim() || 'null')) continue;
+        const key = r.call.sim?.trim() || 'null';
+        const st = simStats.get(key) ?? { count: 0, sim: r.sim ? (r.sim.label ?? `id=${r.sim.id}`) : null };
+        st.count += 1;
+        simStats.set(key, st);
+      }
+      // session.simValues → user-picked raw PHONE_ACCOUNT_ID groups (fallback
+      // for OEMs where SIM identifiers can't be resolved, e.g. Xiaomi/ICCID).
+      const rawValues = session.simValues?.length ? new Set(session.simValues) : null;
+      const matched = rawValues
+        ? resolved.filter((r) => rawValues.has(r.call.sim?.trim() || 'null'))
+        : selectedSim
+          ? resolved.filter((r) => r.sim === selectedSim)
+          : resolved;
+      // Fallback: when the selected SIM matches nothing in this batch but calls
+      // exist whose SIM can't be identified at all, send those unattributed
+      // calls anyway — on OEMs with broken SIM attribution (e.g. Xiaomi/ICCID)
+      // this is the only way the work SIM's calls reach the CRM. Calls that
+      // resolved to a different SIM stay excluded.
+      const fallback =
+        !rawValues && selectedSim && matched.length === 0 ? resolved.filter((r) => r.sim === null) : [];
+      const toUpload = [...matched, ...fallback];
+      skipped += calls.length - toUpload.length;
+      const inWindowCalls = toUpload.filter((r) => r.call.timestamp >= startMs && r.call.timestamp < endMs);
+      const inWindow = inWindowCalls.map((r) => ({ ...r.call, simDetails: r.sim ? simDetailsOf(r.sim) : null }));
       if (inWindow.length > 0) await uploadCalls(session.token, inWindow);
       uploaded += inWindow.length;
-      since = calls[calls.length - 1].timestamp;
-      await saveSession({ ...session, syncFrom: since });
+      fallbackSent += fallback.filter((r) => r.call.timestamp >= startMs && r.call.timestamp < endMs).length;
+      const last = calls[calls.length - 1];
+      since = last.timestamp;
+      sinceId = last.id;
+      await saveSession({ ...session, syncFrom: since, syncFromId: sinceId });
       if (calls.length < BATCH) break;
     }
     await setLastSyncAt(Date.now());
-    return { ok: true, uploaded, requested, skipped };
+    return {
+      ok: true,
+      uploaded,
+      requested,
+      skipped,
+      scanned,
+      fallbackSent: fallbackSent || undefined,
+      simStats: simStats.size
+        ? [...simStats.entries()].map(([value, s]) => ({ value, count: s.count, sim: s.sim }))
+        : undefined,
+      simsInfo: pool.map((s) => ({
+        id: s.id,
+        iccId: s.iccId,
+        slotIndex: s.slotIndex,
+        label: s.label,
+        accountIds: s.accountIds ?? [],
+      })),
+    };
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
       await clearSession();
