@@ -3,11 +3,10 @@
 import { cookies } from "next/headers";
 
 const PERIOD_COOKIE = "crm_dashboard_days";
-export const DASHBOARD_PERIODS = ["today", "7", "15", "30"] as const;
-export type DashboardPeriod = (typeof DASHBOARD_PERIODS)[number];
+const PERIODS = ["today", "7", "15", "30"];
 
 export async function setDashboardPeriod(period: string) {
-  if (!DASHBOARD_PERIODS.includes(period as DashboardPeriod)) return;
+  if (!PERIODS.includes(period)) return;
   const store = await cookies();
   store.set(PERIOD_COOKIE, period, {
     httpOnly: true,
