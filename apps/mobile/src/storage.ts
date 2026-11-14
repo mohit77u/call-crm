@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 export type SessionSim = { iccId: string | null; label: string; subId: number; slotIndex?: number };
-export type Session = { token: string; agentName: string; companyName: string; agentPhone?: string | null; syncFrom: number; syncFromId?: string | null; sim?: SessionSim | null; simAll?: boolean; simValues?: string[] | null; syncReqSeen?: number };
+export type Session = { token: string; agentName: string; companyName: string; agentPhone?: string | null; syncFrom: number; syncFromId?: string | null; sim?: SessionSim | null; simAll?: boolean; syncReqSeen?: number };
 
 const KEYS = { session: 'session', lastSyncAt: 'lastSyncAt', clientCode: 'clientCode', simIdMap: 'simIdMap' } as const;
 

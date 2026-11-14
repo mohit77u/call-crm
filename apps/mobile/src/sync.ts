@@ -27,7 +27,6 @@ export type SyncResult =
       uploaded: number;
       requested?: boolean;
       skipped?: number;
-      fallbackSent?: number;
     }
   | { ok: false; reason: 'logged_out' | 'no_permission' | 'sim_unavailable' | 'error'; message?: string };
 
@@ -132,7 +131,7 @@ async function doSync(): Promise<SyncResult> {
       requested = true;
     }
     if (!permissionsOk) return { ok: false, reason: 'no_permission' };
-    if (!session.sim && !session.simAll && !session.simValues?.length) return { ok: true, uploaded: 0 };
+    if (!session.sim && !session.simAll) return { ok: true, uploaded: 0 };
 
     // simAll → sync call logs from every SIM (no SIM filter).
     // With a selected SIM we fetch all calls and attribute each one in JS —
@@ -166,7 +165,6 @@ async function doSync(): Promise<SyncResult> {
 
     let uploaded = 0;
     let skipped = 0;
-    let fallbackSent = 0;
     let since = session.syncFrom;
     let sinceId: string | null = session.syncFromId ?? null;
     const { startMs, endMs } = istWorkWindowMs();
@@ -174,28 +172,21 @@ async function doSync(): Promise<SyncResult> {
       const calls = await CallLog.getCallsSince(since, sinceId, BATCH);
       if (calls.length === 0) break;
       const resolved = calls.map((c) => ({ call: c, sim: findSimForCall(simsWithIds, c) }));
-      // session.simValues → user-picked raw PHONE_ACCOUNT_ID groups (fallback
-      // for OEMs where SIM identifiers can't be resolved, e.g. Xiaomi/ICCID).
-      const rawValues = session.simValues?.length ? new Set(session.simValues) : null;
-      const matched = rawValues
-        ? resolved.filter((r) => rawValues.has(r.call.sim?.trim() || 'null'))
-        : selectedSim
-          ? resolved.filter((r) => r.sim === selectedSim)
-          : resolved;
-      // Fallback: when the selected SIM matches nothing in this batch but calls
-      // exist whose SIM can't be identified at all, send those unattributed
-      // calls anyway — on OEMs with broken SIM attribution (e.g. Xiaomi/ICCID)
-      // this is the only way the work SIM's calls reach the CRM. Calls that
-      // resolved to a different SIM stay excluded.
-      const fallback =
-        !rawValues && selectedSim && matched.length === 0 ? resolved.filter((r) => r.sim === null) : [];
-      const toUpload = [...matched, ...fallback];
+      const matched = selectedSim ? resolved.filter((r) => r.sim === selectedSim) : resolved;
+      // Fallback: when the selected SIM matches nothing in this batch but the
+      // batch contains calls whose SIM can't be identified at all, send every
+      // call — on OEMs with broken SIM attribution (e.g. Xiaomi storing ICCIDs
+      // we can't resolve) this is the only way work calls reach the CRM. The
+      // raw `sim` value and sim_details still go up so calls can be filtered
+      // manually in the CRM.
+      const hasUnattributed = resolved.some((r) => r.sim === null);
+      const toUpload = selectedSim && matched.length === 0 && hasUnattributed ? resolved : matched;
       skipped += calls.length - toUpload.length;
-      const inWindowCalls = toUpload.filter((r) => r.call.timestamp >= startMs && r.call.timestamp < endMs);
-      const inWindow = inWindowCalls.map((r) => ({ ...r.call, simDetails: r.sim ? simDetailsOf(r.sim) : null }));
+      const inWindow = toUpload
+        .filter((r) => r.call.timestamp >= startMs && r.call.timestamp < endMs)
+        .map((r) => ({ ...r.call, simDetails: r.sim ? simDetailsOf(r.sim) : null }));
       if (inWindow.length > 0) await uploadCalls(session.token, inWindow);
       uploaded += inWindow.length;
-      fallbackSent += fallback.filter((r) => r.call.timestamp >= startMs && r.call.timestamp < endMs).length;
       const last = calls[calls.length - 1];
       since = last.timestamp;
       sinceId = last.id;
@@ -208,7 +199,6 @@ async function doSync(): Promise<SyncResult> {
       uploaded,
       requested,
       skipped,
-      fallbackSent: fallbackSent || undefined,
     };
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {

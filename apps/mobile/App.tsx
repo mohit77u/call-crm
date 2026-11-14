@@ -16,7 +16,7 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 import CallLog from './modules/call-log';
-import type { DeviceCall, SimInfo, SimList } from './modules/call-log';
+import type { SimInfo, SimList } from './modules/call-log';
 import { heartbeat, login, verifyClient } from './src/api';
 import { startBackgroundSync, stopBackgroundSync } from './src/backgroundSync';
 import {
@@ -28,7 +28,7 @@ import {
   saveClientCode,
   saveSession,
 } from './src/storage';
-import { findSimForCall, simIdentifiers, syncCalls } from './src/sync';
+import { syncCalls } from './src/sync';
 
 type Screen = { name: 'loading' } | { name: 'code' } | { name: 'login'; clientCode: string; companyName: string } | { name: 'home'; session: Session };
 
@@ -159,7 +159,7 @@ function LoginScreen(props: { clientCode: string; companyName: string; onBack: (
 
 function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: () => void }) {
   const [sess, setSess] = useState(session);
-  const [pickingSim, setPickingSim] = useState(!session.sim && !session.simAll && !session.simValues?.length);
+  const [pickingSim, setPickingSim] = useState(!session.sim && !session.simAll);
   const [hasPermission, setHasPermission] = useState(CallLog.hasPermission());
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [message, setMessage] = useState('');
@@ -179,11 +179,11 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
       const base = result.requested
         ? 'Synced (requested by admin)'
         : result.uploaded
-          ? `${result.uploaded} new calls sent`
+          ? 'Latest calls synced successfully'
           : result.skipped
-            ? 'No new calls on the selected SIM'
+            ? 'No new calls'
             : 'Up to date';
-      setMessage(result.fallbackSent ? `${base}\n${result.fallbackSent} unattributed calls sent (SIM could not be identified)` : base);
+      setMessage(base);
     }
     else if (result.reason === 'logged_out') onLoggedOut();
     else if (result.reason === 'no_permission') setMessage('Call log permission is needed');
@@ -258,7 +258,7 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
 
       <View style={styles.card}>
         <Row label="Call log permission" value={hasPermission ? 'Allowed' : 'Not allowed'} ok={hasPermission} />
-        <Row label="Work SIM" value={sess.sim?.label ?? (sess.simAll ? 'All SIMs' : sess.simValues?.length ? 'Selected call group' : 'Not selected')} ok={!!sess.sim || !!sess.simAll || !!sess.simValues?.length} />
+        <Row label="Work SIM" value={sess.sim?.label ?? (sess.simAll ? 'All SIMs' : 'Not selected')} ok={!!sess.sim || !!sess.simAll} />
         <Row label="Last sync" value={lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'Not yet'} ok={!!lastSyncAt} />
         {!!message && <Text style={[styles.muted, { marginTop: 8 }]}>{message}</Text>}
       </View>
@@ -288,11 +288,8 @@ function HomeScreen({ session, onLoggedOut }: { session: Session; onLoggedOut: (
   );
 }
 
-type SimGroup = { value: string; count: number; sample: string | null };
-
 function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone: (s: Session) => void }) {
   const [device, setDevice] = useState<SimList | null>(null);
-  const [groups, setGroups] = useState<SimGroup[]>([]);
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
   const autoSaved = useRef(false);
@@ -310,32 +307,6 @@ function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone:
       ]);
       const result = await CallLog.listSims();
       setDevice(result);
-      // Discover distinct PHONE_ACCOUNT_ID groups in recent calls. Groups that
-      // don't resolve to a listed SIM are offered as manual options — covers
-      // OEMs (e.g. Xiaomi storing ICCIDs) where SIMs can't be auto-mapped.
-      try {
-        const since = Date.now() - 3 * 24 * 60 * 60 * 1000;
-        const recent = await CallLog.getCallsSince(since, null, 500);
-        const matchers = result.sims.map((s) => ({ sim: s, ids: simIdentifiers(s) }));
-        const map = new Map<string, { count: number; sample: string | null }>();
-        for (const c of recent) {
-          const key = c.sim?.trim() || 'null';
-          const e = map.get(key) ?? { count: 0, sample: null };
-          e.count += 1;
-          if (!e.sample) {
-            const s = c.name || c.number;
-            if (s) e.sample = s;
-          }
-          map.set(key, e);
-        }
-        setGroups(
-          [...map.entries()]
-            .filter(([value]) => !findSimForCall(matchers, { sim: value === 'null' ? null : value } as DeviceCall))
-            .map(([value, g]) => ({ value, count: g.count, sample: g.sample }))
-        );
-      } catch {
-        setGroups([]);
-      }
     } catch {
       setDevice({ sims: [], slotCount: 0 });
       setLoadError('Unable to read SIM information. Check phone permissions.');
@@ -357,22 +328,7 @@ function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone:
           ...session,
           sim: { iccId: sim.iccId, label: sim.label ?? `SIM ${sim.id}`, subId: sim.id, slotIndex: sim.slotIndex },
           simAll: false,
-          simValues: null,
         };
-        await saveSession(updated);
-        onDone(updated);
-      }
-      setBusy(false);
-    },
-    [onDone]
-  );
-
-  const chooseGroup = useCallback(
-    async (value: string) => {
-      setBusy(true);
-      const session = await getSession();
-      if (session) {
-        const updated: Session = { ...session, sim: null, simAll: false, simValues: [value] };
         await saveSession(updated);
         onDone(updated);
       }
@@ -385,7 +341,7 @@ function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone:
     setBusy(true);
     const session = await getSession();
     if (session) {
-      const updated: Session = { ...session, sim: null, simAll: true, simValues: null };
+      const updated: Session = { ...session, sim: null, simAll: true };
       await saveSession(updated);
       onDone(updated);
     }
@@ -428,21 +384,6 @@ function SimPicker({ agentPhone, onDone }: { agentPhone?: string | null; onDone:
       )}
       {!!loadError && <Button title="Retry" onPress={loadSims} busy={busy} />}
       {!loadError && device && sims.length === 0 && <Button title="Refresh" onPress={loadSims} busy={busy} />}
-      {groups.length > 0 && (
-        <>
-          <Text style={[styles.muted, { marginTop: 16, textAlign: 'center' }]}>
-            Calls found that don’t match the SIMs above — pick the group used for work calls:
-          </Text>
-          {groups.map((g) => (
-            <Button
-              key={g.value}
-              title={`${g.value === 'null' ? 'Calls without SIM info' : 'Other SIM'} · ${g.count} calls${g.sample ? ` · e.g. ${g.sample}` : ''}`}
-              onPress={() => chooseGroup(g.value)}
-              busy={busy}
-            />
-          ))}
-        </>
-      )}
       <Button title="Sync calls from all SIMs" onPress={chooseAll} busy={busy} />
       <Text style={[styles.muted, { marginTop: 8, fontSize: 12, textAlign: 'center' }]}>
         Use this if you only have one work SIM or want every call synced regardless of SIM.
