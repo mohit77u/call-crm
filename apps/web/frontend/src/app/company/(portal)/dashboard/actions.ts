@@ -2,13 +2,14 @@
 
 import { cookies } from "next/headers";
 
-const DAYS_COOKIE = "crm_dashboard_days";
-const DAY_OPTIONS = [7, 15, 30];
+const PERIOD_COOKIE = "crm_dashboard_days";
+export const DASHBOARD_PERIODS = ["today", "7", "15", "30"] as const;
+export type DashboardPeriod = (typeof DASHBOARD_PERIODS)[number];
 
-export async function setDashboardDays(days: number) {
-  if (!DAY_OPTIONS.includes(days)) return;
+export async function setDashboardPeriod(period: string) {
+  if (!DASHBOARD_PERIODS.includes(period as DashboardPeriod)) return;
   const store = await cookies();
-  store.set(DAYS_COOKIE, String(days), {
+  store.set(PERIOD_COOKIE, period, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

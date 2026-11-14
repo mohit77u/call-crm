@@ -3,7 +3,7 @@ import { requireAdmin, getAdminToken, hasFeature } from "@/lib/auth";
 import { apiFetch, ApiError } from "@/lib/api";
 import { formatDateTime, formatMinutes, todayInZone } from "@/lib/calls";
 import { CallsBarChart, StatusDonut } from "./charts";
-import { PeriodPills } from "./period-pills";
+import { PeriodSelect } from "./period-select";
 import { AgentCallsLink } from "./agent-calls-link";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 
@@ -13,7 +13,7 @@ type Totals = { total: number; connected: number; not_connected: number; receive
 type AgentRow = Totals & { id: number; name: string; last_sync_at: string | null; location: { lat: number; lng: number; at: string | null } | null };
 type DashboardData = { totals: Totals | null; prev: Totals | null; daily: { day: string; total: number }[]; agents: AgentRow[] };
 
-const DAY_OPTIONS = [7, 15, 30];
+const PERIOD_OPTIONS = ["today", "7", "15", "30"] as const;
 
 function addDays(dateStr: string, n: number) {
   const d = new Date(`${dateStr}T00:00:00Z`);
@@ -30,8 +30,9 @@ function trend(cur: number, prev: number) {
 export default async function Dashboard() {
   const admin = await requireAdmin();
   const store = await cookies();
-  const daysParam = Number(store.get("crm_dashboard_days")?.value);
-  const days = DAY_OPTIONS.includes(daysParam) ? daysParam : 7;
+  const periodParam = store.get("crm_dashboard_days")?.value;
+  const period = PERIOD_OPTIONS.includes(periodParam as (typeof PERIOD_OPTIONS)[number]) ? periodParam! : "today";
+  const days = period === "today" ? 1 : Number(period);
   const to = todayInZone();
   const from = addDays(to, -(days - 1));
   const canExport = hasFeature(admin, "exports");
@@ -110,10 +111,10 @@ export default async function Dashboard() {
       <div className="page-head">
         <div>
           <h1>Dashboard</h1>
-          <p className="page-sub">{from} → {to} · compared with previous {days} days</p>
+          <p className="page-sub">{from} → {to} · compared with previous {period === "today" ? "day" : `${days} days`}</p>
         </div>
         <div className="page-actions">
-          <PeriodPills days={days} />
+          <PeriodSelect period={period} />
           {canExport && <a className="btn secondary" href={`/api/calls/export?from=${from}&to=${to}`}>Export CSV</a>}
         </div>
       </div>
