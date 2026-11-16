@@ -17,7 +17,12 @@ export function SidebarLinks({ links }: { links: NavLink[] }) {
       {matches.map(({ link, match }) => {
         const active = match && link.href.length === bestLength;
         return (
-          <Link key={link.href} href={link.href} className={`capitalize ${active ? "active" : ""}`}>
+          <Link
+            key={link.href}
+            href={link.href}
+            onClick={() => document.body.classList.remove("nav-open")}
+            className={`capitalize ${active ? "active" : ""}`}
+          >
             {link.label}
           </Link>
         );

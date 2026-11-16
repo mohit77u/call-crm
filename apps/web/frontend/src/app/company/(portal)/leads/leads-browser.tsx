@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { Download, Upload, X, SlidersHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Download, Upload, X, SlidersHorizontal, Pencil, Trash2, UserPlus, ChevronDown } from "lucide-react";
 import { Tooltip } from "@mantine/core";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +15,7 @@ import { AppSelect } from "@/components/app-select";
 import { Spinner } from "@/components/spinner";
 import { notify } from "@/lib/notify";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { createLead, updateLead, deleteLead, assignLeadsToAgent } from "./actions";
+import { createLead, updateLead, deleteLead, deleteLeadsBulk, assignLeadsToAgent } from "./actions";
 import { ImportLeadsModal } from "./import-modal";
 
 type AgentOption = { id: number; name: string; active?: boolean };
@@ -340,6 +340,9 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
   const [importOpen, setImportOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<LeadRow | null>(null);
+  const [bulkDelete, setBulkDelete] = useState<"selected" | "all" | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const bulkRef = useRef<HTMLDivElement>(null);
   const [deletePending, startDeleteTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
@@ -375,6 +378,23 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     window.addEventListener("crm:data-refresh", handler);
     return () => window.removeEventListener("crm:data-refresh", handler);
   }, [load]);
+
+  // Close the bulk-actions dropdown on outside click / Escape.
+  useEffect(() => {
+    if (!bulkOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (bulkRef.current && !bulkRef.current.contains(e.target as Node)) setBulkOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBulkOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [bulkOpen]);
 
   const pageRows = data?.leads ?? [];
   const allPageSelected = pageRows.length > 0 && pageRows.every((l) => selectedIds.has(l.id));
@@ -563,13 +583,51 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
           )}
         </button>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setAssignOpen(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            <UserPlus size={14} /> {selectedPageIds.length > 0 ? `Assign selected (${selectedPageIds.length})` : "Assign to agent"}
-          </button>
+          <div ref={bulkRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setBulkOpen((o) => !o)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Bulk actions
+              {selectedIds.size > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-600 px-1 text-[11px] font-semibold text-white">
+                  {selectedIds.size}
+                </span>
+              )}
+              <ChevronDown size={14} className="text-slate-400" />
+            </button>
+            {bulkOpen && (
+              <div className="absolute right-0 top-full z-40 mt-1 w-52 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { setBulkOpen(false); setAssignOpen(true); }}
+                  className="flex w-full items-center gap-2 bg-transparent px-3 py-1.5 text-left text-[13px] text-slate-600 shadow-none hover:bg-slate-50"
+                >
+                  <UserPlus size={14} className="text-slate-400" />
+                  {selectedPageIds.length > 0 ? `Assign selected (${selectedPageIds.length})` : "Assign to agent"}
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedIds.size === 0}
+                  onClick={() => { setBulkOpen(false); setBulkDelete("selected"); }}
+                  className="flex w-full items-center gap-2 bg-transparent px-3 py-1.5 text-left text-[13px] text-slate-600 shadow-none hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 size={14} className="text-slate-400" />
+                  Delete selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+                </button>
+                <button
+                  type="button"
+                  disabled={!data || data.total === 0}
+                  onClick={() => { setBulkOpen(false); setBulkDelete("all"); }}
+                  className="flex w-full items-center gap-2 bg-transparent px-3 py-1.5 text-left text-[13px] text-red-500 shadow-none hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 size={14} className="text-red-400" />
+                  Delete all
+                </button>
+              </div>
+            )}
+          </div>
           {(() => {
             const exportQs = new URLSearchParams();
             if (q) exportQs.set("q", q);
@@ -675,6 +733,33 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
             if (res.error) notify.error(res.error);
             else {
               notify.success(res.notice ?? "Lead deleted");
+              load();
+            }
+          });
+        }}
+      />
+
+      <ConfirmDialog
+        open={bulkDelete != null}
+        onClose={() => setBulkDelete(null)}
+        title={bulkDelete === "all" ? "Delete all leads?" : "Delete selected leads?"}
+        message={
+          bulkDelete === "all"
+            ? `This will delete ALL ${data?.total ?? 0} leads. This cannot be undone.`
+            : `Delete ${selectedIds.size} selected lead${selectedIds.size === 1 ? "" : "s"}? This cannot be undone.`
+        }
+        confirmLabel="Delete"
+        danger
+        pending={deletePending}
+        onConfirm={() => {
+          if (!bulkDelete) return;
+          startDeleteTransition(async () => {
+            const res = await deleteLeadsBulk(bulkDelete === "all" ? { all: true } : { ids: [...selectedIds] });
+            setBulkDelete(null);
+            if (res.error) notify.error(res.error);
+            else {
+              notify.success(res.notice ?? "Leads deleted");
+              setSelectedIds(new Set());
               load();
             }
           });

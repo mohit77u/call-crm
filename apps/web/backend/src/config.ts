@@ -30,6 +30,18 @@ export const config = {
     .filter(Boolean),
   superadminPassword: process.env.SUPERADMIN_PASSWORD ?? "",
   contactTo: process.env.CONTACT_TO?.trim() || "mohiit77u@gmail.com",
+  redisUrl: (() => {
+    const url = process.env.REDIS_URL?.trim();
+    if (url) return url;
+    const host = process.env.REDIS_HOST?.trim();
+    if (!host) return "";
+    const port = process.env.REDIS_PORT?.trim() || "6379";
+    const user = process.env.REDIS_USERNAME?.trim();
+    const pass = process.env.REDIS_PASSWORD ?? "";
+    const scheme = process.env.REDIS_SCHEME?.trim() || "redis";
+    const auth = user ? `${encodeURIComponent(user)}:${encodeURIComponent(pass)}@` : pass ? `:${encodeURIComponent(pass)}@` : "";
+    return `${scheme}://${auth}${host}:${port}`;
+  })(),
   smtp: {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),

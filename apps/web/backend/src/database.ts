@@ -191,6 +191,31 @@ CREATE TABLE IF NOT EXISTS free_trials (
   deleted_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS free_trials_agent ON free_trials (agent_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS lead_imports (
+  id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  file_name TEXT NOT NULL,
+  file_data BYTEA NOT NULL,
+  file_headers JSONB NOT NULL DEFAULT '[]'::jsonb,
+  has_header BOOLEAN NOT NULL DEFAULT true,
+  assign_mode TEXT NOT NULL DEFAULT 'none',
+  assign_agent_id INT,
+  status TEXT NOT NULL DEFAULT 'processing',
+  total_rows INT NOT NULL DEFAULT 0,
+  imported INT NOT NULL DEFAULT 0,
+  failed INT NOT NULL DEFAULT 0,
+  pending INT NOT NULL DEFAULT 0,
+  error_rows JSONB NOT NULL DEFAULT '[]'::jsonb,
+  error_message TEXT,
+  created_by_admin_id INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS lead_imports_company ON lead_imports (company_id, created_at DESC);
+ALTER TABLE lead_imports ADD COLUMN IF NOT EXISTS file_headers JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE lead_imports ADD COLUMN IF NOT EXISTS column_mapping JSONB;
+ALTER TABLE lead_imports ADD COLUMN IF NOT EXISTS cursor INT NOT NULL DEFAULT 0;
 `;
 
 // TypeORM's query() returns [rows, affectedCount] for UPDATE/DELETE but a plain

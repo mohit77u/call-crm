@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, KeyRound, LogOut, X } from "lucide-react";
+import { User, KeyRound, LogOut, X, Menu } from "lucide-react";
 import { profileFormSchema, changePasswordSchema, type ProfileFormValues, type ChangePasswordValues } from "@/lib/validation";
 import { TextField, PasswordField, ReqMark } from "@/components/fields";
 import { NotificationBell } from "@/components/notification-bell";
@@ -182,10 +182,15 @@ export function PortalHeader({
   logout: () => void | Promise<void>;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    document.body.classList.remove("nav-open");
+  }, [pathname]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -207,9 +212,19 @@ export function PortalHeader({
 
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
-      {companyName && (
-        <p className="min-w-0 truncate text-sm font-semibold text-slate-700">{companyName}</p>
-      )}
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          aria-label="Menu"
+          onClick={() => document.body.classList.toggle("nav-open")}
+          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 max-[900px]:inline-flex"
+        >
+          <Menu size={20} />
+        </button>
+        {companyName && (
+          <p className="min-w-0 truncate text-sm font-semibold text-slate-700">{companyName}</p>
+        )}
+      </div>
       <div className="flex items-center gap-2 sm:gap-3">
       <div className="hidden min-w-0 text-right sm:block">
         <p className="truncate text-sm font-semibold text-slate-800">{name}</p>

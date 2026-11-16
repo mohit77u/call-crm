@@ -1,11 +1,12 @@
-import { Router } from "express";
+import { Router, raw } from "express";
 import { z } from "zod";
-import { asyncHandler, badRequest } from "../../shared/errors";
+import { asyncHandler, badRequest, notFound } from "../../shared/errors";
 import { requireAdmin, requireAgent, requireFeature } from "../../middleware/auth";
 import { isLeadStatus } from "../../shared/leads";
 import { csvCell, sendCsv } from "../../shared/csv";
 import { TIME_ZONE } from "../../shared/calls";
 import * as leadsService from "./leads.service";
+import { enqueueLeadImport, importQueueEnabled } from "./import-queue";
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body ?? {});
@@ -179,6 +180,106 @@ crmLeadsRouter.post(
   asyncHandler(async (req, res) => {
     const input = parse(importSchema, req.body);
     res.json(await leadsService.adminImportLeads(req.admin!, input));
+  }),
+);
+
+// Raw file upload (csv/xlsx/xls, up to ~8 MB). The file is stored and parsed
+// by a background worker when Redis is configured; otherwise it runs inline.
+crmLeadsRouter.post(
+  "/import-file",
+  raw({ type: "application/octet-stream", limit: "8mb" }),
+  asyncHandler(async (req, res) => {
+    const buffer = req.body as Buffer;
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw badRequest("Empty file");
+    const mode = q(req.query.assign) || "none";
+    const assignment = {
+      mode: (["none", "agent", "roundrobin", "random"] as const).includes(mode as never)
+        ? (mode as "none" | "agent" | "roundrobin" | "random")
+        : ("none" as const),
+      agentId: /^\d+$/.test(q(req.query.agentId)) ? Number(q(req.query.agentId)) : null,
+    };
+    const rec = await leadsService.createLeadImport(req.admin!, {
+      buffer,
+      fileName: q(req.query.fileName) || "import",
+      hasHeader: q(req.query.hasHeader) !== "0" && q(req.query.hasHeader) !== "false",
+      assignment,
+    });
+    // File is stored and parsed up-front; the client confirms column mapping
+    // before the background job is enqueued.
+    res.status(201).json({
+      importId: rec.id,
+      status: "awaiting_mapping",
+      headers: rec.headers,
+      mapping: rec.mapping,
+    });
+  }),
+);
+
+const confirmMappingSchema = z.object({
+  mapping: z.object({
+    name: z.number().int().min(0).optional(),
+    phone: z.number().int().min(0).optional(),
+    email: z.number().int().min(0).optional(),
+    notes: z.number().int().min(0).optional(),
+  }),
+  assign: z
+    .object({
+      mode: z.enum(["none", "agent", "roundrobin", "random"]).optional(),
+      agentId: z.number().int().positive().nullish(),
+    })
+    .optional(),
+});
+
+crmLeadsRouter.post(
+  "/imports/:id/confirm",
+  asyncHandler(async (req, res) => {
+    const input = parse(confirmMappingSchema, req.body);
+    await leadsService.confirmLeadImport(req.admin!, Number(req.params.id), input.mapping, input.assign);
+    if (importQueueEnabled()) {
+      await enqueueLeadImport(Number(req.params.id));
+      res.status(202).json({ status: "processing" });
+      return;
+    }
+    await leadsService.processLeadImport(Number(req.params.id));
+    const result = await leadsService.getLeadImportResult(req.admin!, Number(req.params.id));
+    res.json({ status: "completed", ...result });
+  }),
+);
+
+crmLeadsRouter.get(
+  "/imports",
+  asyncHandler(async (req, res) => {
+    res.json({ imports: await leadsService.listLeadImports(req.admin!) });
+  }),
+);
+
+crmLeadsRouter.get(
+  "/imports/:id/errors.csv",
+  asyncHandler(async (req, res) => {
+    const data = await leadsService.getLeadImportErrors(req.admin!, Number(req.params.id));
+    if (!data) throw notFound("Import not found");
+    sendCsv(
+      res,
+      `import-${req.params.id}-errors.csv`,
+      [...data.headers, "Error"].map(csvCell).join(","),
+      data.errors.map((e) =>
+        // Pad/truncate cells to the header width so every CSV row is aligned.
+        [...data.headers.map((_, i) => csvCell(e.cells[i])), csvCell(e.reason)].join(","),
+      ),
+    );
+  }),
+);
+
+const bulkDeleteSchema = z.object({
+  ids: z.array(z.number().int().positive()).max(5000).optional(),
+  all: z.boolean().optional(),
+});
+
+crmLeadsRouter.post(
+  "/bulk-delete",
+  asyncHandler(async (req, res) => {
+    const input = parse(bulkDeleteSchema, req.body);
+    res.json(await leadsService.adminDeleteLeadsBulk(req.admin!, input));
   }),
 );
 

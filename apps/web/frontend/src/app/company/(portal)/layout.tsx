@@ -13,6 +13,7 @@ export default async function CrmLayout({ children }: LayoutProps<"/">) {
       ? [
           { href: "/company/leads", label: "Leads" },
           { href: "/company/trials", label: "Free trial" },
+          { href: "/company/imported-files", label: "Imported files" },
         ]
       : []),
     { href: "/company/agents", label: "Agents" },

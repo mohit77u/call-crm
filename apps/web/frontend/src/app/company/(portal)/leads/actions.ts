@@ -61,6 +61,23 @@ export async function deleteLead(id: number): Promise<LeadActionState> {
   }
 }
 
+export async function deleteLeadsBulk(input: { ids?: number[]; all?: boolean }): Promise<LeadActionState & { deleted?: number; requested?: number }> {
+  await requireAdmin();
+  try {
+    const res = await apiFetch<{ deleted: number; requested: number }>("/api/crm/leads/bulk-delete", { body: input, token: await getAdminToken() });
+    const skipped = res.requested > 0 ? res.requested - res.deleted : 0;
+    const notice =
+      res.deleted === 0
+        ? "No leads deleted (already removed)"
+        : skipped > 0
+          ? `${res.deleted} lead${res.deleted === 1 ? "" : "s"} deleted (${skipped} already removed)`
+          : `${res.deleted} lead${res.deleted === 1 ? "" : "s"} deleted`;
+    return { notice, deleted: res.deleted, requested: res.requested };
+  } catch (e) {
+    return fail(e, "Could not delete leads");
+  }
+}
+
 export async function assignLeadsToAgent(input: { count: number; agentId: number; leadIds?: number[] }): Promise<LeadActionState & { assigned?: number; requested?: number }> {
   await requireAdmin();
   try {
