@@ -52,6 +52,9 @@ export function CompanyAdminsForm({ companyId, admins }: { companyId: number; ad
   const canAdd =
     admins.filter((a) => !removeIds.includes(a.id)).length + rows.filter((r) => r.id == null).length < MAX_ADMINS;
 
+  const remaining = admins.filter((a) => !removeIds.includes(a.id)).length + rows.filter((r) => r.id == null).length;
+  const canRemoveRow = (r: Row) => r.remove || remaining > 1;
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const upserts = rows
@@ -94,11 +97,12 @@ export function CompanyAdminsForm({ companyId, admins }: { companyId: number; ad
         </button>
       </div>
       <p className="muted">Up to {MAX_ADMINS} admins per company. Leave password blank to keep the current one.</p>
-      <div className="flex flex-col gap-3">
+      {remaining <= 1 && <p className="text-xs font-medium text-red-500">At least one admin is required</p>}
+      <div className="flex flex-col gap-2">
         {rows.map((r) => (
           <div
             key={r.key}
-            className={`grid grid-cols-1 gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_1fr_auto] ${r.remove ? "border-red-200 bg-red-50/50 opacity-60" : "border-slate-200"}`}
+            className={`grid grid-cols-1 gap-2 rounded-lg border p-2.5 sm:grid-cols-[1fr_1fr_1fr_auto] ${r.remove ? "border-red-200 bg-red-50/50 opacity-60" : "border-slate-200"}`}
           >
             <input
               value={r.name}
@@ -126,9 +130,10 @@ export function CompanyAdminsForm({ companyId, admins }: { companyId: number; ad
             <button
               type="button"
               onClick={() => toggleRemove(r)}
-              disabled={pending}
-              className="inline-flex h-9 w-9 items-center justify-center self-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+              disabled={pending || !canRemoveRow(r)}
+              className="inline-flex items-center justify-center self-center rounded-md bg-transparent p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label={r.remove ? "Undo remove" : "Remove admin"}
+              title={canRemoveRow(r) ? undefined : "At least one admin is required"}
             >
               <Trash2 size={16} />
             </button>

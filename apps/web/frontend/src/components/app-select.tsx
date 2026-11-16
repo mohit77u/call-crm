@@ -3,8 +3,8 @@
 import { Select } from "@mantine/core";
 import type { SelectProps } from "@mantine/core";
 
-// Common select — Mantine Select, no check icon, scrollable dropdown,
-// selected option highlighted. `className` applies to the wrapper div (use for width).
+// Common select — Mantine Select with check icon + aligned labels, scrollable
+// dropdown, selected option highlighted. `className` applies to the wrapper div (use for width).
 export function AppSelect({ className, ...props }: SelectProps & { className?: string }) {
   return (
     <div className={className}>
@@ -15,7 +15,7 @@ export function AppSelect({ className, ...props }: SelectProps & { className?: s
         withCheckIcon
         withAlignedLabels
         checkIconPosition="left"
-        scrollAreaProps={{ mah: 180, type: "auto" }}
+        scrollAreaProps={{ mah: 180, type: "auto", scrollbars: "y" }}
         {...props}
       />
     </div>

@@ -20,6 +20,14 @@ const agentLoginSchema = z.object({
 const refreshSchema = z.object({ refreshToken: z.string().min(1).max(4000) });
 const forgotSchema = z.object({ email: emailSchema });
 const resetSchema = z.object({ token: z.string().min(1).max(200), password: z.string().min(8).max(200) });
+const agentProfileSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100),
+  phone: z.string().trim().max(20).nullish(),
+});
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters").max(100),
+});
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
@@ -63,6 +71,24 @@ authRouter.post(
   }),
 );
 
+authRouter.patch(
+  "/agent/profile",
+  requireAgent,
+  asyncHandler(async (req, res) => {
+    const input = parse(agentProfileSchema, req.body);
+    res.json(await authService.agentUpdateProfile(req.agent!, input));
+  }),
+);
+
+authRouter.post(
+  "/agent/password",
+  requireAgent,
+  asyncHandler(async (req, res) => {
+    const input = parse(passwordChangeSchema, req.body);
+    res.json(await authService.agentChangePassword(req.agent!, input.currentPassword, input.newPassword));
+  }),
+);
+
 authRouter.get(
   "/agent/me",
   requireAgent,
@@ -73,6 +99,7 @@ authRouter.get(
         id: a.agentId,
         name: a.name,
         username: a.username,
+        phone: a.phone,
         companyId: a.companyId,
         companyName: a.companyName,
         clientCode: a.clientCode,

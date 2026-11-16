@@ -14,7 +14,7 @@ export async function adminLogin(email: string, password: string) {
     `SELECT a.id AS admin_id, a.name, a.email, a.password_hash,
             c.id AS company_id, c.name AS company_name, c.client_code, c.features
      FROM admins a JOIN companies c ON c.id = a.company_id
-     WHERE a.email = $1`,
+     WHERE a.email = $1 AND a.deleted_at IS NULL AND c.deleted_at IS NULL`,
     [email],
   );
   const row = rows[0];
@@ -43,7 +43,7 @@ export async function agentLogin(clientCode: string, username: string, password:
     `SELECT a.id AS agent_id, a.name, a.username, a.password_hash, a.active,
             c.id AS company_id, c.name AS company_name, c.client_code, c.features
      FROM agents a JOIN companies c ON c.id = a.company_id
-     WHERE c.client_code = $1 AND a.username = $2`,
+     WHERE c.client_code = $1 AND a.username = $2 AND a.deleted_at IS NULL AND c.deleted_at IS NULL`,
     [normalizeClientCode(clientCode), username.trim().toLowerCase()],
   );
   const row = rows[0];
@@ -65,6 +65,26 @@ export async function agentLogin(clientCode: string, username: string, password:
       features: normalizeFeatures(row.features),
     },
   };
+}
+
+export async function agentUpdateProfile(agent: { agentId: number; companyId: number }, input: { name: string; phone?: string | null }) {
+  await AppDataSource.query("UPDATE agents SET name = $3, phone = $4 WHERE id = $1 AND company_id = $2", [
+    agent.agentId,
+    agent.companyId,
+    input.name,
+    input.phone ?? null,
+  ]);
+  return { ok: true };
+}
+
+export async function agentChangePassword(agent: { agentId: number }, currentPassword: string, newPassword: string) {
+  const rows = await AppDataSource.query("SELECT password_hash FROM agents WHERE id = $1", [agent.agentId]);
+  const row = rows[0];
+  if (!row || !(await checkPassword(currentPassword, row.password_hash))) {
+    throw unauthorized("Current password is wrong");
+  }
+  await AppDataSource.query("UPDATE agents SET password_hash = $2 WHERE id = $1", [agent.agentId, await hashPassword(newPassword)]);
+  return { ok: true };
 }
 
 export async function platformLogin(email: string, password: string) {
@@ -111,7 +131,7 @@ export async function refreshSession(refreshToken: string) {
 
   let token: string;
   if (payload.role === "admin") {
-    const admins = await AppDataSource.query("SELECT company_id FROM admins WHERE id = $1", [payload.userId]);
+    const admins = await AppDataSource.query("SELECT company_id FROM admins WHERE id = $1 AND deleted_at IS NULL", [payload.userId]);
     if (!admins[0]) throw unauthorized("Session expired — please log in again");
     token = signAdminToken({ adminId: payload.userId, companyId: admins[0].company_id });
   } else if (payload.role === "platform") {
@@ -119,7 +139,7 @@ export async function refreshSession(refreshToken: string) {
     if (!platforms[0]) throw unauthorized("Session expired — please log in again");
     token = signPlatformToken({ superadminId: payload.userId });
   } else {
-    const agents = await AppDataSource.query("SELECT company_id FROM agents WHERE id = $1 AND active", [payload.userId]);
+    const agents = await AppDataSource.query("SELECT company_id FROM agents WHERE id = $1 AND active AND deleted_at IS NULL", [payload.userId]);
     if (!agents[0]) throw unauthorized("Session expired — please log in again");
     token = signAgentToken({ agentId: payload.userId, companyId: agents[0].company_id });
   }
@@ -137,7 +157,7 @@ export async function logoutSession(refreshToken: string) {
 export async function requestPasswordReset(email: string) {
   if (!mailConfigured()) throw badRequest("Email is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS.");
 
-  const companyAdmin = await AppDataSource.query("SELECT 1 FROM admins WHERE email = $1", [email]);
+  const companyAdmin = await AppDataSource.query("SELECT 1 FROM admins WHERE email = $1 AND deleted_at IS NULL", [email]);
   const platform = companyAdmin.length === 0
     ? await AppDataSource.query("SELECT 1 FROM superadmins WHERE email = $1", [email])
     : [];
@@ -179,7 +199,7 @@ export async function resetPassword(token: string, password: string) {
   if (row.role === "superadmin") {
     await AppDataSource.query("UPDATE superadmins SET password_hash = $1 WHERE email = $2", [hash, row.email]);
   } else {
-    await AppDataSource.query("UPDATE admins SET password_hash = $1 WHERE email = $2", [hash, row.email]);
+    await AppDataSource.query("UPDATE admins SET password_hash = $1 WHERE email = $2 AND deleted_at IS NULL", [hash, row.email]);
   }
   await AppDataSource.query("UPDATE password_resets SET used_at = now() WHERE id = $1", [row.id]);
   return { role: row.role };

@@ -12,6 +12,9 @@ import { settingsRouter } from "./modules/settings/settings.controller";
 import { adminRouter } from "./modules/superadmin/superadmin.controller";
 import { contactRouter } from "./modules/contact/contact.controller";
 import { agentLeadsRouter, crmLeadsRouter } from "./modules/leads/leads.controller";
+import { agentNotificationsRouter, crmNotificationsRouter } from "./modules/notifications/notifications.controller";
+import { agentTrialsRouter, crmTrialsRouter } from "./modules/trials/trials.controller";
+import { agentDashboardRouter } from "./modules/call-logs/calls.controller";
 
 export function createApp() {
   const app = express();
@@ -39,7 +42,12 @@ export function createApp() {
   app.use("/api/crm/dashboard", dashboardRouter);
   app.use("/api/crm/settings", settingsRouter);
   app.use("/api/crm/leads", crmLeadsRouter);
+  app.use("/api/crm/trials", crmTrialsRouter);
+  app.use("/api/crm/notifications", crmNotificationsRouter);
   app.use("/api/agent/leads", agentLeadsRouter);
+  app.use("/api/agent/trials", agentTrialsRouter);
+  app.use("/api/agent/dashboard", agentDashboardRouter);
+  app.use("/api/agent/notifications", agentNotificationsRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/contact", contactRouter);
 

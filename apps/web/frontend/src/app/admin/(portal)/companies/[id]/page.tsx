@@ -39,7 +39,7 @@ export default async function CompanyDetailPage({ params }: PageProps<"/admin/co
   return (
     <>
       <p><Link href="/admin/companies">&larr; Companies</Link></p>
-      <h1>{company.name} <span className="badge other" style={{ verticalAlign: "middle" }}>{planDisplayName(company.plan)}</span></h1>
+      <h1 className="text-2xl! font-bold!">{company.name} <span className="badge other" style={{ verticalAlign: "middle" }}>{planDisplayName(company.plan)}</span></h1>
 
       <div className="stats">
         <div className="stat"><div className="label">Agents</div><div className="value">{counts?.agents ?? 0}</div></div>
@@ -62,6 +62,18 @@ export default async function CompanyDetailPage({ params }: PageProps<"/admin/co
           <RegenerateCodeButton companyId={company.id} />
           <span className="muted" style={{ marginLeft: 8 }}>Existing logged-in phones stay connected.</span>
         </div>
+      </div>
+
+      <div className="card">
+        <h2>Admins</h2>
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {admins.map((a) => (
+            <li key={a.id} className="text-sm">
+              <span className="font-medium text-slate-800">{a.name}</span>
+              <span className="muted"> · {a.email}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <CompanyAdminsForm companyId={company.id} admins={admins} />

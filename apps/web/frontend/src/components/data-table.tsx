@@ -17,14 +17,19 @@ type DataTableProps<T> = {
   footer?: ReactNode;
 };
 
-export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = false, emptyMessage = "No records.", minHeight, footer }: DataTableProps<T>) {
+export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = false, emptyMessage = "No records.", minHeight = 420, footer }: DataTableProps<T>) {
   const colCount = columns.length;
   return (
-    <div
-      className="mb-3.5 overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm"
-      style={minHeight && loading ? { minHeight } : undefined}
-    >
-      <table className="w-full border-collapse">
+    <div className="mb-1.5 w-full min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      {loading ? (
+        <div className="flex items-center justify-center" style={{ minHeight }}>
+          <span className="inline-flex flex-col items-center justify-center gap-3 text-sm text-slate-500">
+            <span className="inline-block h-8 w-8 animate-spin rounded-full border-[3px] border-slate-300 border-t-[var(--primary)]" />
+            Loading…
+          </span>
+        </div>
+      ) : (
+      <table className="w-full min-w-max border-collapse">
         <thead>
           <tr className="border-b border-slate-200">
             {columns.map((c, i) => (
@@ -35,16 +40,7 @@ export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = fa
           </tr>
         </thead>
         <tbody>
-          {loading ? (
-            <tr>
-              <td colSpan={colCount} className="px-3 py-20 text-center">
-                <span className="inline-flex items-center justify-center gap-2 text-sm text-slate-500">
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[var(--primary)]" />
-                  Loading…
-                </span>
-              </td>
-            </tr>
-          ) : rows.length === 0 ? (
+          {rows.length === 0 ? (
             <tr>
               <td colSpan={colCount} className="px-3 py-16 text-center text-sm text-slate-500">
                 {emptyMessage}
@@ -63,6 +59,7 @@ export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = fa
           )}
         </tbody>
       </table>
+      )}
       {footer}
     </div>
   );

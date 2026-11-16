@@ -1,0 +1,150 @@
+import { cookies } from "next/headers";
+import { requireAgent, getAgentToken, hasFeature } from "@/lib/auth";
+import { apiFetch, ApiError } from "@/lib/api";
+import { formatDateTime, formatMinutes, todayInZone } from "@/lib/calls";
+import { CallsBarChart, StatusDonut } from "@/app/company/(portal)/dashboard/charts";
+import { PeriodSelect } from "@/app/company/(portal)/dashboard/period-select";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
+
+export const metadata = { title: "Dashboard" };
+
+type Totals = { total: number; connected: number; not_connected: number; received: number; missed: number; talk_sec: number };
+type AgentRow = Totals & { id: number; name: string; last_sync_at: string | null; location: { lat: number; lng: number; at: string | null } | null };
+type DashboardData = { totals: Totals | null; prev: Totals | null; daily: { day: string; total: number }[]; agents: AgentRow[] };
+
+const PERIOD_OPTIONS = ["today", "7", "15", "30"] as const;
+
+function addDays(dateStr: string, n: number) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function trend(cur: number, prev: number) {
+  if (prev === 0) return cur > 0 ? { text: "new", up: true } : null;
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  return { text: `${pct > 0 ? "+" : ""}${pct}%`, up: pct >= 0 };
+}
+
+export default async function AgentDashboard() {
+  const agent = await requireAgent();
+  const store = await cookies();
+  const periodParam = store.get("crm_dashboard_days")?.value;
+  const period = PERIOD_OPTIONS.includes(periodParam as (typeof PERIOD_OPTIONS)[number]) ? periodParam! : "today";
+  const days = period === "today" ? 1 : Number(period);
+  const to = todayInZone();
+  const from = addDays(to, -(days - 1));
+  const canLocation = hasFeature(agent, "locations");
+
+  if (!hasFeature(agent, "reports")) {
+    return (
+      <>
+        <div className="page-head"><div><h1>Dashboard</h1><p className="page-sub">Call performance overview</p></div></div>
+        <div className="card"><p className="muted">Reports are not enabled for your plan. Contact support to upgrade.</p></div>
+      </>
+    );
+  }
+
+  let data: DashboardData;
+  try {
+    data = await apiFetch<DashboardData>(`/api/agent/dashboard?from=${from}&to=${to}`, { token: await getAgentToken() });
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 403) {
+      return (
+        <>
+          <div className="page-head"><div><h1>Dashboard</h1><p className="page-sub">Call performance overview</p></div></div>
+          <div className="card"><p className="muted">Reports are not enabled for your plan. Contact support to upgrade.</p></div>
+        </>
+      );
+    }
+    throw e;
+  }
+
+  const t = data.totals ?? { total: 0, connected: 0, not_connected: 0, received: 0, missed: 0, talk_sec: 0 };
+  const p = data.prev ?? { total: 0, connected: 0, not_connected: 0, received: 0, missed: 0, talk_sec: 0 };
+  const connRate = t.total ? Math.round(((t.connected + t.received) / t.total) * 100) : 0;
+  const prevConnRate = p.total ? Math.round(((p.connected + p.received) / p.total) * 100) : 0;
+
+  const kpis: { label: string; value: string | number; tr?: ReturnType<typeof trend>; icon: string }[] = [
+    { label: "Total calls", value: t.total, tr: trend(t.total, p.total), icon: "📞" },
+    { label: "Connected rate", value: `${connRate}%`, tr: trend(connRate, prevConnRate), icon: "📈" },
+    { label: "Connected calls", value: t.connected, tr: trend(t.connected, p.connected), icon: "✅" },
+    { label: "Missed / rejected", value: t.missed, tr: trend(t.missed, p.missed), icon: "📵" },
+    { label: "Talk time", value: formatMinutes(t.talk_sec), tr: trend(t.talk_sec, p.talk_sec), icon: "⏱" },
+  ];
+
+  const statusParts = [
+    { name: "Connected", value: t.connected, color: "#22c55e" },
+    { name: "Received", value: t.received, color: "#3b82f6" },
+    { name: "Missed / other", value: t.total - t.connected - t.received, color: "#f59e0b" },
+  ];
+
+  const agentColumns: DataTableColumn<AgentRow>[] = [
+    { header: "Agent", cell: (a) => <span className="text-sm font-medium">{a.name}</span> },
+    { header: "Total", cell: (a) => a.total },
+    { header: "Connected", cell: (a) => a.connected },
+    { header: "Not connected", cell: (a) => a.not_connected },
+    { header: "Received", cell: (a) => a.received },
+    { header: "Missed", cell: (a) => a.missed },
+    { header: "Talk time", cell: (a) => formatMinutes(a.talk_sec) },
+    { header: "Last sync", cell: (a) => <span className="muted">{a.last_sync_at ? formatDateTime(a.last_sync_at) : "Never"}</span> },
+  ];
+  if (canLocation) {
+    agentColumns.push({
+      header: "Location",
+      cell: (a) =>
+        a.location ? (
+          <a href={`https://maps.google.com/?q=${a.location.lat},${a.location.lng}`} target="_blank" rel="noreferrer" className="muted">
+            {a.location.lat.toFixed(4)}, {a.location.lng.toFixed(4)}
+          </a>
+        ) : (
+          <span className="muted">-</span>
+        ),
+    });
+  }
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Dashboard</h1>
+          <p className="page-sub">{from} → {to} · compared with previous {period === "today" ? "day" : `${days} days`}</p>
+        </div>
+        <div className="page-actions">
+          <PeriodSelect period={period} />
+        </div>
+      </div>
+
+      <div className="stats">
+        {kpis.map((k) => (
+          <div className="stat" key={k.label}>
+            <div className="label"><span className="kpi-ico">{k.icon}</span>{k.label}</div>
+            <div className="value">{k.value}</div>
+            {k.tr && <div className={`trend ${k.tr.up ? "up" : "down"}`}>{k.tr.up ? "▲" : "▼"} {k.tr.text} vs prev</div>}
+          </div>
+        ))}
+      </div>
+
+      <div className="dash-grid">
+        <div className="card">
+          <h2>Calls per day</h2>
+          {data.daily.length === 0 ? <p className="muted">No calls in this period.</p> : <CallsBarChart data={data.daily} />}
+        </div>
+        <div className="card">
+          <h2>Call status</h2>
+          {t.total === 0 ? <p className="muted">No calls in this period.</p> : <StatusDonut data={statusParts} />}
+        </div>
+      </div>
+
+      <div>
+        <h2>My performance</h2>
+        <DataTable
+          rowKey={(a) => a.id}
+          rows={data.agents}
+          emptyMessage="No call data yet."
+          columns={agentColumns}
+        />
+      </div>
+    </>
+  );
+}

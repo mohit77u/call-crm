@@ -15,13 +15,6 @@ function parse<T>(schema: z.ZodType<T>, body: unknown): T {
 
 const optStr = (max: number) => z.string().trim().max(max).nullish();
 
-const requestSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  phone: optStr(50),
-  email: optStr(200),
-  notes: optStr(2000),
-});
-
 const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
   phone: optStr(50),
@@ -45,6 +38,11 @@ const patchSchema = z.object({
 
 const approveSchema = z.object({ agentId: z.number().int().positive() });
 const rejectSchema = z.object({ reason: optStr(500) });
+const assignSchema = z.object({
+  agentId: z.number().int().positive(),
+  count: z.number().int().min(1).max(10000),
+  leadIds: z.array(z.number().int().positive()).max(500).optional(),
+});
 const importSchema = z.object({
   rows: z.array(z.array(z.unknown())).max(5000),
   mapping: z.object({
@@ -84,8 +82,7 @@ agentLeadsRouter.get(
 agentLeadsRouter.post(
   "/requests",
   asyncHandler(async (req, res) => {
-    const input = parse(requestSchema, req.body);
-    res.status(201).json({ lead: await leadsService.agentCreateRequest(req.agent!, input) });
+    res.json(await leadsService.agentRequestLeads(req.agent!));
   }),
 );
 
@@ -117,6 +114,7 @@ crmLeadsRouter.get(
           agent: q(req.query.agent),
           status: isLeadStatus(status) ? status : "",
           q: q(req.query.q),
+          accountCreated: q(req.query.accountCreated),
           createdFrom: q(req.query.createdFrom),
           createdTo: q(req.query.createdTo),
         },
@@ -143,6 +141,13 @@ crmLeadsRouter.patch(
   }),
 );
 
+crmLeadsRouter.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    res.json(await leadsService.adminDeleteLead(req.admin!, Number(req.params.id)));
+  }),
+);
+
 crmLeadsRouter.get(
   "/export",
   asyncHandler(async (req, res) => {
@@ -151,6 +156,7 @@ crmLeadsRouter.get(
       agent: q(req.query.agent),
       status: isLeadStatus(status) ? status : "",
       q: q(req.query.q),
+      accountCreated: q(req.query.accountCreated),
       createdFrom: q(req.query.createdFrom),
       createdTo: q(req.query.createdTo),
     });
@@ -173,6 +179,14 @@ crmLeadsRouter.post(
   asyncHandler(async (req, res) => {
     const input = parse(importSchema, req.body);
     res.json(await leadsService.adminImportLeads(req.admin!, input));
+  }),
+);
+
+crmLeadsRouter.post(
+  "/assign",
+  asyncHandler(async (req, res) => {
+    const input = parse(assignSchema, req.body);
+    res.json(await leadsService.adminAssignLeads(req.admin!, input.agentId, input.count, input.leadIds));
   }),
 );
 

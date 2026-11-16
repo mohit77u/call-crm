@@ -51,6 +51,29 @@ export async function updateLead(
   }
 }
 
+export async function deleteLead(id: number): Promise<LeadActionState> {
+  await requireAdmin();
+  try {
+    await apiFetch(`/api/crm/leads/${id}`, { method: "DELETE", token: await getAdminToken() });
+    return { notice: "Lead deleted" };
+  } catch (e) {
+    return fail(e, "Could not delete lead");
+  }
+}
+
+export async function assignLeadsToAgent(input: { count: number; agentId: number; leadIds?: number[] }): Promise<LeadActionState & { assigned?: number; requested?: number }> {
+  await requireAdmin();
+  try {
+    const res = await apiFetch<{ assigned: number; requested: number }>("/api/crm/leads/assign", {
+      body: input,
+      token: await getAdminToken(),
+    });
+    return { assigned: res.assigned, requested: res.requested };
+  } catch (e) {
+    return fail(e, "Could not assign leads");
+  }
+}
+
 export async function approveLeadRequest(id: number, agentId: number): Promise<LeadActionState> {
   await requireAdmin();
   try {

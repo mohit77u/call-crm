@@ -161,6 +161,36 @@ CREATE INDEX IF NOT EXISTS leads_company ON leads (company_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS leads_agent ON leads (assigned_agent_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS leads_request ON leads (company_id, request_status) WHERE request_status IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS leads_company_phone ON leads (company_id, phone) WHERE phone IS NOT NULL AND phone <> '';
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  recipient_type TEXT NOT NULL,
+  agent_id INT REFERENCES agents(id) ON DELETE CASCADE,
+  admin_id INT REFERENCES admins(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  link TEXT,
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_agent_unread ON notifications (agent_id) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS notifications_admin_unread ON notifications (admin_id) WHERE read_at IS NULL;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE admins ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS free_trials (
+  id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  agent_id INT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  days INT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS free_trials_agent ON free_trials (agent_id, created_at DESC);
 `;
 
 // TypeORM's query() returns [rows, affectedCount] for UPDATE/DELETE but a plain

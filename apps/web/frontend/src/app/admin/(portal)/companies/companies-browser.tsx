@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 import { SearchInput } from "@/components/search-input";
 import { formatDateTime } from "@/lib/calls";
 import { planDisplayName } from "@/lib/plans";
 import { setNavState } from "@/lib/nav-state";
 import { deleteCompany } from "./actions";
-import { RowActionsMenu } from "@/components/row-actions-menu";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { notify } from "@/lib/notify";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 export type CompanyRow = {
@@ -25,6 +27,8 @@ export type CompanyRow = {
 export function CompaniesBrowser({ companies }: { companies: CompanyRow[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<CompanyRow | null>(null);
+  const [deletePending, startDeleteTransition] = useTransition();
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -52,7 +56,7 @@ export function CompaniesBrowser({ companies }: { companies: CompanyRow[] }) {
             { header: "Company", cell: (c) => <Link href={`/admin/companies/${c.id}`}>{c.name}</Link> },
             { header: "Plan", cell: (c) => <span className="badge other">{planDisplayName(c.plan)}</span> },
             { header: "Client Code", cell: (c) => <span className="muted">{c.client_code}</span> },
-            { header: "Admin Email", cell: (c) => c.admin_email ?? "-" },
+            { header: "Admin Email", cell: (c) => <span className="whitespace-pre-line text-sm">{c.admin_email ?? "-"}</span> },
             { header: "Agents", cell: (c) => (
               <a href="/admin/agents" onClick={(e) => { e.preventDefault(); setNavState("crm:admin:agents:company", String(c.id)); router.push("/admin/agents"); }}>{c.agents}</a>
             ) },
@@ -61,20 +65,53 @@ export function CompaniesBrowser({ companies }: { companies: CompanyRow[] }) {
             ) },
             { header: "Created", cell: (c) => <span className="muted">{formatDateTime(c.created_at)}</span> },
             {
-              header: "Actions",
-              className: "text-right!",
+              header: "",
+              className: "sticky right-0 z-10 min-w-[88px] bg-white",
               cell: (c) => (
-                <RowActionsMenu
-                  editHref={`/admin/companies/${c.id}`}
-                  itemName={c.name}
-                  itemLabel="company"
-                  deleteMessage={`All admins, agents, phones and call history of ${c.name} will be permanently removed.`}
-                  deleteAction={deleteCompany.bind(null, c.id)}
-                  successMessage="Company deleted"
-                />
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href={`/admin/companies/${c.id}`}
+                    aria-label="Edit company"
+                    title="Edit"
+                    className="inline-flex items-center justify-center rounded-md bg-slate-200 p-2.5 text-slate-700 transition-colors hover:bg-slate-300"
+                  >
+                    <Pencil size={12} strokeWidth={2.2} color="#334155" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(c)}
+                    aria-label="Delete company"
+                    title="Delete"
+                    className="inline-flex items-center justify-center rounded-md bg-red-50 p-2.5 text-red-500 transition-colors hover:bg-red-100"
+                  >
+                    <Trash2 size={12} strokeWidth={2.2} />
+                  </button>
+                </div>
               ),
             },
           ] satisfies DataTableColumn<CompanyRow>[]}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete company?"
+        message={deleteTarget ? `All admins, agents, phones and call history of ${deleteTarget.name} will be permanently removed.` : undefined}
+        confirmLabel="Delete"
+        danger
+        pending={deletePending}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          startDeleteTransition(async () => {
+            const res = await deleteCompany(deleteTarget.id);
+            setDeleteTarget(null);
+            if (res?.error) notify.error(res.error);
+            else {
+              notify.success("Company deleted");
+              router.refresh();
+            }
+          });
+        }}
       />
     </>
   );

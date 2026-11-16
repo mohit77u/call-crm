@@ -22,7 +22,7 @@ type IncomingCall = {
 };
 
 export async function verifyClient(clientCode: unknown) {
-  const rows = await AppDataSource.query("SELECT name FROM companies WHERE client_code = $1", [
+  const rows = await AppDataSource.query("SELECT name FROM companies WHERE client_code = $1 AND deleted_at IS NULL", [
     normalizeClientCode(clientCode),
   ]);
   if (rows.length === 0) throw notFound("Invalid client code");
@@ -33,7 +33,7 @@ export async function appLogin(clientCode: unknown, username: string, password: 
   const rows = await AppDataSource.query(
     `SELECT a.id, a.name, a.phone, a.company_id, c.name AS company_name, a.password_hash, a.active
      FROM agents a JOIN companies c ON c.id = a.company_id
-     WHERE c.client_code = $1 AND a.username = $2`,
+     WHERE c.client_code = $1 AND a.username = $2 AND a.deleted_at IS NULL AND c.deleted_at IS NULL`,
     [normalizeClientCode(clientCode), username],
   );
   const agent = rows[0];

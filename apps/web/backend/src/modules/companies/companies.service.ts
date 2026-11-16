@@ -17,14 +17,14 @@ export type CompanyRow = {
 const COMPANY_COLS = `id, name, client_code AS "clientCode", features, plan, created_at AS "createdAt"`;
 
 export async function findByClientCode(code: unknown): Promise<CompanyRow | null> {
-  const rows = await AppDataSource.query(`SELECT ${COMPANY_COLS} FROM companies WHERE client_code = $1`, [
+  const rows = await AppDataSource.query(`SELECT ${COMPANY_COLS} FROM companies WHERE client_code = $1 AND deleted_at IS NULL`, [
     normalizeClientCode(code),
   ]);
   return rows[0] ?? null;
 }
 
 export async function findById(id: number): Promise<CompanyRow | null> {
-  const rows = await AppDataSource.query(`SELECT ${COMPANY_COLS} FROM companies WHERE id = $1`, [id]);
+  const rows = await AppDataSource.query(`SELECT ${COMPANY_COLS} FROM companies WHERE id = $1 AND deleted_at IS NULL`, [id]);
   return rows[0] ?? null;
 }
 
@@ -83,7 +83,7 @@ export async function updateCompanyAdmins(
   },
 ) {
   await getOr404(companyId);
-  const existing = (await AppDataSource.query("SELECT id, name, email FROM admins WHERE company_id = $1", [companyId])) as {
+  const existing = (await AppDataSource.query("SELECT id, name, email FROM admins WHERE company_id = $1 AND deleted_at IS NULL", [companyId])) as {
     id: number;
     name: string;
     email: string;
@@ -108,7 +108,7 @@ export async function updateCompanyAdmins(
   ];
   if (new Set(finalEmails).size !== finalEmails.length) throw badRequest("Admin emails must be unique");
   for (const email of finalEmails) {
-    const clash = await AppDataSource.query("SELECT id, company_id FROM admins WHERE email = $1", [email]);
+    const clash = await AppDataSource.query("SELECT id, company_id FROM admins WHERE email = $1 AND deleted_at IS NULL", [email]);
     for (const row of clash as { id: number; company_id: number }[]) {
       const isSelf = updating.some((u) => u.id === row.id && row.company_id === companyId);
       if (!isSelf) throw badRequest("This email is already registered");
@@ -120,7 +120,7 @@ export async function updateCompanyAdmins(
   await qr.startTransaction();
   try {
     for (const id of removeSet) {
-      await qr.query("DELETE FROM admins WHERE id = $1 AND company_id = $2", [id, companyId]);
+      await qr.query("UPDATE admins SET deleted_at = now() WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL", [id, companyId]);
     }
     for (const u of updating) {
       const sets = ["name = $3", "email = $4"];
@@ -129,7 +129,7 @@ export async function updateCompanyAdmins(
         params.push(await hashPassword(u.password));
         sets.push(`password_hash = $${params.length}`);
       }
-      await qr.query(`UPDATE admins SET ${sets.join(", ")} WHERE id = $1 AND company_id = $2`, params);
+      await qr.query(`UPDATE admins SET ${sets.join(", ")} WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`, params);
     }
     for (const u of creating) {
       if (!u.password) throw badRequest("Password is required for new admins");
@@ -147,7 +147,7 @@ export async function updateCompanyAdmins(
   } finally {
     await qr.release();
   }
-  return AppDataSource.query("SELECT id, name, email, created_at AS \"createdAt\" FROM admins WHERE company_id = $1 ORDER BY id", [companyId]);
+  return AppDataSource.query("SELECT id, name, email, created_at AS \"createdAt\" FROM admins WHERE company_id = $1 AND deleted_at IS NULL ORDER BY id", [companyId]);
 }
 
 export async function updateCompany(id: number, patch: { name?: string; plan?: string | null; features?: unknown }) {

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { requireSuperadmin } from "@/lib/auth";
 import { SidebarLinks } from "@/components/sidebar-links";
+import { PortalHeader } from "@/components/portal-header";
 import { platformLogout } from "../actions";
 
 const ADMIN_LINKS = [
@@ -17,14 +18,21 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     <div className="shell">
       <nav className="sidebar">
         <div className="brand"><Image src="/logo.png" className="brand-logo" width={30} height={30} alt="" />Call CRM</div>
-        <div className="company">Platform admin</div>
-        <div className="muted" style={{ fontSize: 12, padding: "0 10px 8px" }}>{admin.email}</div>
+        <div className="h-4" aria-hidden />
         <SidebarLinks links={ADMIN_LINKS} />
-        <form action={platformLogout}>
-          <button className="secondary" type="submit">Logout</button>
-        </form>
       </nav>
-      <main className="main admin-main">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <PortalHeader
+          name={admin.name}
+          email={admin.email}
+          companyName="Platform admin"
+          profileUrl="/api/admin/profile"
+          passwordUrl="/api/admin/password"
+          loginId={{ label: "Email", value: admin.email }}
+          logout={platformLogout}
+        />
+        <main className="main admin-main">{children}</main>
+      </div>
     </div>
   );
 }

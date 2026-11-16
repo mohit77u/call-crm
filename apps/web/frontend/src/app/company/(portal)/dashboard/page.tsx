@@ -35,7 +35,6 @@ export default async function Dashboard() {
   const days = period === "today" ? 1 : Number(period);
   const to = todayInZone();
   const from = addDays(to, -(days - 1));
-  const canExport = hasFeature(admin, "exports");
   const canLocation = hasFeature(admin, "locations");
 
   if (!hasFeature(admin, "reports")) {
@@ -115,7 +114,6 @@ export default async function Dashboard() {
         </div>
         <div className="page-actions">
           <PeriodSelect period={period} />
-          {canExport && <a className="btn secondary" href={`/api/calls/export?from=${from}&to=${to}`}>Export CSV</a>}
         </div>
       </div>
 

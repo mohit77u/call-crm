@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../shared/errors";
-import { requireAdmin, requireFeature } from "../../middleware/auth";
+import { requireAdmin, requireAgent, requireFeature } from "../../middleware/auth";
 import { csvCell, sendCsv } from "../../shared/csv";
 import { STATUS_LABELS } from "../../shared/calls";
 import { parseCallFilters } from "./call-filters";
@@ -48,6 +48,18 @@ dashboardRouter.get(
   asyncHandler(async (req, res) => {
     const f = parseCallFilters(req.query as Record<string, unknown>);
     res.json(await callsService.dashboard(req.admin!.companyId, f));
+  }),
+);
+
+export const agentDashboardRouter = Router();
+agentDashboardRouter.use(requireAgent);
+
+agentDashboardRouter.get(
+  "/",
+  requireFeature("reports"),
+  asyncHandler(async (req, res) => {
+    const f = parseCallFilters(req.query as Record<string, unknown>);
+    res.json(await callsService.agentDashboard(req.agent!.companyId, req.agent!.agentId, f));
   }),
 );
 

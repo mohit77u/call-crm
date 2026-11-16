@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Download, Upload, X, SlidersHorizontal, Pencil } from "lucide-react";
+import { Download, Upload, X, SlidersHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
+import { Tooltip } from "@mantine/core";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { leadFormSchema, type LeadFormValues } from "@/lib/validation";
+import { leadFormSchema, assignLeadsSchema, type LeadFormValues, type AssignLeadsValues } from "@/lib/validation";
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, leadStatusLabel, type LeadRow } from "@/lib/leads";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Pagination } from "@/components/pagination";
@@ -13,7 +14,8 @@ import { TextField, EmailField, TextareaField, SelectField, ReqMark } from "@/co
 import { AppSelect } from "@/components/app-select";
 import { Spinner } from "@/components/spinner";
 import { notify } from "@/lib/notify";
-import { createLead, updateLead } from "./actions";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { createLead, updateLead, deleteLead, assignLeadsToAgent } from "./actions";
 import { ImportLeadsModal } from "./import-modal";
 
 type AgentOption = { id: number; name: string; active?: boolean };
@@ -21,7 +23,7 @@ type LeadsResponse = { leads: LeadRow[]; total: number; page: number; pages: num
 
 function fmtDate(s: string | null) {
   if (!s) return "-";
-  return new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return new Date(s).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 const ALL = "__all";
@@ -36,15 +38,24 @@ const STATUS_PILL: Record<string, string> = {
   do_not_call: "bg-slate-200 text-slate-600",
 };
 
+function fmtPhone(p: string | null) {
+  const d = (p ?? "").replace(/\D/g, "");
+  return d ? d.slice(-10) : "";
+}
+
 function NotesCell({ notes }: { notes: string | null }) {
   if (!notes) return <span className="text-sm text-slate-400">-</span>;
   return (
-    <span className="group relative block max-w-[240px]">
-      <span className="line-clamp-2 block text-sm text-slate-600">{notes}</span>
-      <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 whitespace-pre-wrap rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-normal text-white shadow-lg group-hover:block">
-        {notes}
-      </span>
-    </span>
+    <Tooltip
+      label={<span className="whitespace-pre-wrap break-words">{notes}</span>}
+      multiline
+      w={280}
+      position="top"
+      withArrow
+      openDelay={200}
+    >
+      <span className="line-clamp-2 max-w-[300px] break-words text-sm text-slate-600">{notes}</span>
+    </Tooltip>
   );
 }
 
@@ -136,23 +147,25 @@ function LeadFormModal({
             name="name"
             control={control}
             render={({ field, fieldState }) => (
-              <TextField {...field} label={<>Name<ReqMark /></>} error={fieldState.error?.message} />
+              <TextField {...field} label={<>Name<ReqMark /></>} placeholder="Enter name" error={fieldState.error?.message} />
             )}
           />
           <Controller
             name="phone"
             control={control}
             render={({ field, fieldState }) => (
-              <TextField {...field} label="Phone" error={fieldState.error?.message} />
+              <TextField {...field} label={<>Phone<ReqMark /></>} placeholder="10-digit phone number" error={fieldState.error?.message} />
             )}
           />
-          <Controller
-            name="email"
-            control={control}
-            render={({ field, fieldState }) => (
-              <EmailField {...field} label="Email" error={fieldState.error?.message} />
-            )}
-          />
+          <div className="sm:col-span-2">
+            <Controller
+              name="email"
+              control={control}
+              render={({ field, fieldState }) => (
+                <EmailField {...field} label="Email" error={fieldState.error?.message} />
+              )}
+            />
+          </div>
           <Controller
             name="status"
             control={control}
@@ -160,13 +173,14 @@ function LeadFormModal({
               <SelectField
                 name="status"
                 label="Status"
+                placeholder="Select status"
                 data={LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }))}
                 value={field.value}
                 onChange={(v) => field.onChange(v ?? "new")}
               />
             )}
           />
-          <div className="sm:col-span-2">
+          <div>
             <Controller
               name="assignedAgentId"
               control={control}
@@ -188,7 +202,7 @@ function LeadFormModal({
               name="notes"
               control={control}
               render={({ field, fieldState }) => (
-                <TextareaField {...field} label="Notes" autosize minRows={3} error={fieldState.error?.message} />
+                <TextareaField {...field} label="Notes" placeholder="Add notes" autosize minRows={3} error={fieldState.error?.message} />
               )}
             />
           </div>
@@ -206,6 +220,104 @@ function LeadFormModal({
   );
 }
 
+function AssignLeadsModal({ agents, selectedIds, onClose, onDone }: { agents: AgentOption[]; selectedIds: number[]; onClose: () => void; onDone: () => void }) {
+  const [pending, startTransition] = useTransition();
+  const selectedCount = selectedIds.length;
+  const { control, handleSubmit, reset } = useForm<AssignLeadsValues>({
+    resolver: zodResolver(assignLeadsSchema),
+    defaultValues: { count: selectedCount > 0 ? String(selectedCount) : "", agentId: "" },
+  });
+
+  useEffect(() => {
+    reset({ count: selectedCount > 0 ? String(selectedCount) : "", agentId: "" });
+  }, [reset, selectedCount]);
+
+  function onValid(data: AssignLeadsValues) {
+    const count = Number(data.count);
+    const agentId = Number(data.agentId);
+    startTransition(async () => {
+      const res = await assignLeadsToAgent({ count, agentId, leadIds: selectedCount > 0 ? selectedIds : undefined });
+      if (res.error) {
+        notify.error(res.error);
+        return;
+      }
+      const agentName = agents.find((a) => a.id === agentId)?.name ?? "agent";
+      const assigned = res.assigned ?? 0;
+      const requested = res.requested ?? count;
+      notify.success(
+        assigned < requested
+          ? `Assigned ${assigned} of ${requested} leads to ${agentName} (only ${assigned} unassigned available)`
+          : `Assigned ${assigned} lead${assigned === 1 ? "" : "s"} to ${agentName}`,
+      );
+      onDone();
+      onClose();
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => !pending && onClose()}>
+      <div className="relative w-full max-w-sm rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <span
+          role="button"
+          aria-label="Close"
+          onClick={() => {
+            if (!pending) onClose();
+          }}
+          className="absolute right-3 top-3 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        >
+          <X size={16} />
+        </span>
+        <h3 className="mb-1 pr-6 text-base font-semibold text-slate-900">Assign leads to agent</h3>
+        <p className="mb-4 text-sm text-slate-500">
+          {selectedCount > 0
+            ? `${selectedCount} selected lead${selectedCount === 1 ? "" : "s"} will be assigned.`
+            : "Randomly assigns unassigned leads. If fewer are available, all of them are assigned."}
+        </p>
+        <form onSubmit={handleSubmit(onValid)} className="grid grid-cols-1 gap-3">
+          <Controller
+            name="count"
+            control={control}
+            render={({ field, fieldState }) => (
+              <TextField
+                {...field}
+                type="number"
+                min={1}
+                readOnly={selectedCount > 0}
+                label={selectedCount > 0 ? "Selected leads" : <>How many leads<ReqMark /></>}
+                placeholder="e.g. 20"
+                error={fieldState.error?.message}
+              />
+            )}
+          />
+          <Controller
+            name="agentId"
+            control={control}
+            render={({ field, fieldState }) => (
+              <SelectField
+                name="agentId"
+                label={<>Assign to agent<ReqMark /></>}
+                placeholder="Select agent"
+                data={agents.map((a) => ({ value: String(a.id), label: a.name }))}
+                value={field.value || null}
+                onChange={(v) => field.onChange(v ?? "")}
+                error={fieldState.error?.message}
+              />
+            )}
+          />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onClose} disabled={pending} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white hover:bg-[var(--primary-dark)] disabled:opacity-60">
+              {pending ? <><Spinner />Assigning…</> : "Assign"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
   const [data, setData] = useState<LeadsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -213,17 +325,23 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
   const [q, setQ] = useState("");
   const [agentFilter, setAgentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [accountCreated, setAccountCreated] = useState("");
   const [createdFrom, setAssignedFrom] = useState("");
   const [createdTo, setAssignedTo] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftAgent, setDraftAgent] = useState("");
   const [draftStatus, setDraftStatus] = useState("");
+  const [draftAccountCreated, setDraftAccountCreated] = useState("");
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [modal, setModal] = useState<{ open: boolean; lead: LeadRow | null }>({ open: false, lead: null });
   const [importOpen, setImportOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<LeadRow | null>(null);
+  const [deletePending, startDeleteTransition] = useTransition();
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -233,6 +351,7 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
       if (q) sp.set("q", q);
       if (agentFilter) sp.set("agent", agentFilter);
       if (statusFilter) sp.set("status", statusFilter);
+      if (accountCreated) sp.set("accountCreated", accountCreated);
       if (createdFrom) sp.set("createdFrom", createdFrom);
       if (createdTo) sp.set("createdTo", createdTo);
       const res = await fetch(`/api/crm/leads?${sp}`);
@@ -243,14 +362,64 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     } finally {
       setLoading(false);
     }
-  }, [q, agentFilter, statusFilter, createdFrom, createdTo, page, perPage]);
+  }, [q, agentFilter, statusFilter, accountCreated, createdFrom, createdTo, page, perPage]);
 
   useEffect(() => {
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, [load]);
 
+  // Refresh table when a notification links back to this page.
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener("crm:data-refresh", handler);
+    return () => window.removeEventListener("crm:data-refresh", handler);
+  }, [load]);
+
+  const pageRows = data?.leads ?? [];
+  const allPageSelected = pageRows.length > 0 && pageRows.every((l) => selectedIds.has(l.id));
+
+  const toggleAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageRows.forEach((l) => next.delete(l.id));
+      else pageRows.forEach((l) => next.add(l.id));
+      return next;
+    });
+  };
+
+  const toggleOne = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const columns: DataTableColumn<LeadRow>[] = [
+    {
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Select all leads"
+          checked={allPageSelected}
+          disabled={pageRows.length === 0}
+          onChange={toggleAll}
+          className="h-4 w-4 accent-[var(--primary)]"
+        />
+      ),
+      className: "w-10",
+      cell: (l) => (
+        <input
+          type="checkbox"
+          aria-label={`Select ${l.name}`}
+          checked={selectedIds.has(l.id)}
+          onChange={() => toggleOne(l.id)}
+          className="h-4 w-4 accent-[var(--primary)]"
+        />
+      ),
+    },
     {
       header: "Name",
       className: "min-w-[140px] whitespace-nowrap",
@@ -258,8 +427,11 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     },
     {
       header: "Phone",
-      className: "min-w-[120px] whitespace-nowrap",
-      cell: (l) => <span className="text-sm">{l.phone || <span className="text-slate-400">-</span>}</span>,
+      className: "w-[130px] whitespace-nowrap",
+      cell: (l) => {
+        const phone = fmtPhone(l.phone);
+        return <span className="text-sm">{phone || <span className="text-slate-400">-</span>}</span>;
+      },
     },
     {
       header: "Email",
@@ -275,7 +447,7 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
       header: "Status",
       className: "min-w-[120px] whitespace-nowrap",
       cell: (l) => (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_PILL[l.status] ?? "bg-slate-100 text-slate-600"}`}>
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-normal ${STATUS_PILL[l.status] ?? "bg-slate-100 text-slate-600"}`}>
           {leadStatusLabel(l.status)}
         </span>
       ),
@@ -292,32 +464,46 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     },
     {
       header: "Notes",
-      className: "min-w-[220px]",
+      className: "min-w-[220px] whitespace-normal",
       cell: (l) => <NotesCell notes={l.notes} />,
     },
+    { header: "Created", className: "min-w-[130px] whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.createdAt)}</span> },
     { header: "Updated", className: "min-w-[130px] whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.updatedAt)}</span> },
     {
       header: "",
-      className: "sticky right-0 z-10 min-w-[56px] border-l border-slate-200 bg-white",
+      className: "sticky right-0 z-10 min-w-[96px] bg-white",
       cell: (l) => (
-        <button
-          type="button"
-          onClick={() => setModal({ open: true, lead: l })}
-          aria-label="Edit lead"
-          title="Edit"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-200 text-slate-700 transition-colors hover:bg-slate-300"
-        >
-          <Pencil size={15} strokeWidth={2.2} color="#334155" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setModal({ open: true, lead: l })}
+            aria-label="Edit lead"
+            title="Edit"
+            className="inline-flex items-center justify-center rounded-md bg-slate-200 p-2.5 text-slate-700 transition-colors hover:bg-slate-300"
+          >
+            <Pencil size={12} strokeWidth={2.2} color="#334155" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteTarget(l)}
+            aria-label="Delete lead"
+            title="Delete"
+            className="inline-flex items-center justify-center rounded-md bg-red-50 p-2.5 text-red-500 transition-colors hover:bg-red-100"
+          >
+            <Trash2 size={12} strokeWidth={2.2} />
+          </button>
+        </div>
       ),
     },
   ];
 
-  const appliedCount = [agentFilter, statusFilter, createdFrom, createdTo].filter(Boolean).length;
+  const appliedCount = [agentFilter, statusFilter, accountCreated, createdFrom, createdTo].filter(Boolean).length;
+  const selectedPageIds = pageRows.filter((l) => selectedIds.has(l.id)).map((l) => l.id);
 
   const openFilter = () => {
     setDraftAgent(agentFilter);
     setDraftStatus(statusFilter);
+    setDraftAccountCreated(accountCreated);
     setDraftFrom(createdFrom);
     setDraftTo(createdTo);
     setFilterOpen(true);
@@ -326,6 +512,7 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
   const applyFilters = () => {
     setAgentFilter(draftAgent);
     setStatusFilter(draftStatus);
+    setAccountCreated(draftAccountCreated);
     setAssignedFrom(draftFrom);
     setAssignedTo(draftTo);
     setPage(1);
@@ -335,10 +522,12 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
   const clearFilters = () => {
     setDraftAgent("");
     setDraftStatus("");
+    setDraftAccountCreated("");
     setDraftFrom("");
     setDraftTo("");
     setAgentFilter("");
     setStatusFilter("");
+    setAccountCreated("");
     setAssignedFrom("");
     setAssignedTo("");
     setPage(1);
@@ -374,11 +563,19 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
           )}
         </button>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAssignOpen(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <UserPlus size={14} /> {selectedPageIds.length > 0 ? `Assign selected (${selectedPageIds.length})` : "Assign to agent"}
+          </button>
           {(() => {
             const exportQs = new URLSearchParams();
             if (q) exportQs.set("q", q);
             if (agentFilter) exportQs.set("agent", agentFilter);
             if (statusFilter) exportQs.set("status", statusFilter);
+            if (accountCreated) exportQs.set("accountCreated", accountCreated);
             if (createdFrom) exportQs.set("createdFrom", createdFrom);
             if (createdTo) exportQs.set("createdTo", createdTo);
             return (
@@ -451,6 +648,38 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
       {importOpen && (
         <ImportLeadsModal agents={agents} onClose={() => setImportOpen(false)} onDone={load} />
       )}
+      {assignOpen && (
+        <AssignLeadsModal
+          agents={agents}
+          selectedIds={selectedPageIds}
+          onClose={() => setAssignOpen(false)}
+          onDone={() => {
+            setSelectedIds(new Set());
+            load();
+          }}
+        />
+      )}
+      <ConfirmDialog
+        open={deleteTarget != null}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete lead?"
+        message={deleteTarget ? `Delete "${deleteTarget.name}"? This cannot be undone.` : undefined}
+        confirmLabel="Delete"
+        danger
+        pending={deletePending}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          startDeleteTransition(async () => {
+            const res = await deleteLead(deleteTarget.id);
+            setDeleteTarget(null);
+            if (res.error) notify.error(res.error);
+            else {
+              notify.success(res.notice ?? "Lead deleted");
+              load();
+            }
+          });
+        }}
+      />
 
       {filterOpen && (
         <>
@@ -479,6 +708,18 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
                   value={draftStatus || ALL}
                   onChange={(v) => setDraftStatus(v === ALL ? "" : v ?? "")}
                   data={[{ value: ALL, label: "All statuses" }, ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }))]}
+                />
+              </label>
+              <label className="drawer-field">
+                <span>Account created</span>
+                <AppSelect
+                  value={draftAccountCreated || ALL}
+                  onChange={(v) => setDraftAccountCreated(v === ALL ? "" : v ?? "")}
+                  data={[
+                    { value: ALL, label: "All" },
+                    { value: "yes", label: "Yes" },
+                    { value: "no", label: "No" },
+                  ]}
                 />
               </label>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Created date</p>

@@ -33,6 +33,7 @@ export type CurrentAgent = {
   id: number;
   name: string;
   username: string;
+  phone?: string | null;
   companyId: number;
   companyName: string;
   clientCode: string;

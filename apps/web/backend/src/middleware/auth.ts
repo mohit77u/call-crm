@@ -20,6 +20,7 @@ export type AgentContext = {
   agentId: number;
   name: string;
   username: string;
+  phone: string | null;
   companyId: number;
   companyName: string;
   clientCode: string;
@@ -60,7 +61,7 @@ export const requireAdmin = asyncHandler(async (req: Request, _res: Response, ne
     `SELECT a.id AS admin_id, a.name, a.email,
             c.id AS company_id, c.name AS company_name, c.client_code, c.features
      FROM admins a JOIN companies c ON c.id = a.company_id
-     WHERE a.id = $1 AND a.company_id = $2`,
+     WHERE a.id = $1 AND a.company_id = $2 AND a.deleted_at IS NULL AND c.deleted_at IS NULL`,
     [payload.adminId, payload.companyId],
   );
   const row = rows[0];
@@ -96,7 +97,7 @@ export const requireAppDevice = asyncHandler(async (req: Request, _res: Response
      FROM devices d
      JOIN agents a ON a.id = d.agent_id
      JOIN companies c ON c.id = d.company_id
-     WHERE d.id = $1 AND d.agent_id = $2 AND d.company_id = $3 AND NOT d.revoked AND a.active`,
+     WHERE d.id = $1 AND d.agent_id = $2 AND d.company_id = $3 AND NOT d.revoked AND a.active AND a.deleted_at IS NULL AND c.deleted_at IS NULL`,
     [payload.deviceId, payload.agentId, payload.companyId],
   );
   const row = rows[0];
@@ -117,10 +118,10 @@ export const requireAgent = asyncHandler(async (req: Request, _res: Response, ne
   const payload = bearerToken(req) ? verifyToken<AgentToken>(bearerToken(req)!) : null;
   if (!payload || payload.typ !== "agent") throw unauthorized();
   const rows = await AppDataSource.query(
-    `SELECT a.id AS agent_id, a.name, a.username,
+    `SELECT a.id AS agent_id, a.name, a.username, a.phone,
             c.id AS company_id, c.name AS company_name, c.client_code, c.features
      FROM agents a JOIN companies c ON c.id = a.company_id
-     WHERE a.id = $1 AND a.company_id = $2 AND a.active`,
+     WHERE a.id = $1 AND a.company_id = $2 AND a.active AND a.deleted_at IS NULL AND c.deleted_at IS NULL`,
     [payload.agentId, payload.companyId],
   );
   const row = rows[0];
@@ -129,6 +130,7 @@ export const requireAgent = asyncHandler(async (req: Request, _res: Response, ne
     agentId: row.agent_id,
     name: row.name,
     username: row.username,
+    phone: row.phone ?? null,
     companyId: row.company_id,
     companyName: row.company_name,
     clientCode: row.client_code,

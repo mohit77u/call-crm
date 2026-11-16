@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { requireAdmin, hasFeature } from "@/lib/auth";
 import { SidebarLinks } from "@/components/sidebar-links";
+import { PortalHeader } from "@/components/portal-header";
 import { logout } from "../actions";
 
 export default async function CrmLayout({ children }: LayoutProps<"/">) {
@@ -11,7 +12,7 @@ export default async function CrmLayout({ children }: LayoutProps<"/">) {
     ...(hasFeature(admin, "leadManagement")
       ? [
           { href: "/company/leads", label: "Leads" },
-          { href: "/company/leads/requests", label: "Lead requests" },
+          { href: "/company/trials", label: "Free trial" },
         ]
       : []),
     { href: "/company/agents", label: "Agents" },
@@ -21,13 +22,23 @@ export default async function CrmLayout({ children }: LayoutProps<"/">) {
     <div className="shell">
       <nav className="sidebar">
         <div className="brand"><Image src="/logo.png" className="brand-logo" width={30} height={30} alt="" />Call CRM</div>
-        <div className="company">{admin.companyName}</div>
+        <div className="h-4" aria-hidden />
         <SidebarLinks links={links} />
-        <form action={logout}>
-          <button className="secondary" type="submit">Logout</button>
-        </form>
       </nav>
-      <main className="main">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <PortalHeader
+          name={admin.name}
+          email={admin.email}
+          companyName={admin.companyName}
+          listUrl="/api/crm/notifications"
+          readUrl="/api/crm/notifications/read"
+          profileUrl="/api/crm/profile"
+          passwordUrl="/api/crm/password"
+          loginId={{ label: "Email", value: admin.email }}
+          logout={logout}
+        />
+        <main className="main">{children}</main>
+      </div>
     </div>
   );
 }

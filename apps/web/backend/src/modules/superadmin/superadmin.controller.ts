@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import { asyncHandler, badRequest } from "../../shared/errors";
+import { asyncHandler, badRequest, unauthorized } from "../../shared/errors";
 import { requireSuperadmin } from "../../middleware/auth";
+import { AppDataSource } from "../../database";
+import { checkPassword, hashPassword } from "../../shared/password";
 import { csvCell, sendCsv } from "../../shared/csv";
 import { STATUS_LABELS } from "../../shared/calls";
 import { FEATURE_DEFS, LIMIT_DEFS } from "../../shared/features";
@@ -48,11 +50,45 @@ const updateCompanySchema = z.object({
   features: z.record(z.union([z.boolean(), z.number(), z.null()])).optional(),
 });
 
+const profileSchema = z.object({ name: z.string().trim().min(1, "Name is required").max(100) });
+const passwordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters").max(100),
+});
+
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body ?? {});
   if (!result.success) throw badRequest("Invalid request");
   return result.data;
 }
+
+adminRouter.patch(
+  "/profile",
+  asyncHandler(async (req, res) => {
+    const result = profileSchema.safeParse(req.body);
+    if (!result.success) throw badRequest(result.error.issues[0]?.message ?? "Invalid request");
+    await AppDataSource.query("UPDATE superadmins SET name = $2 WHERE id = $1", [req.platform!.superadminId, result.data.name]);
+    res.json({ ok: true });
+  }),
+);
+
+adminRouter.post(
+  "/password",
+  asyncHandler(async (req, res) => {
+    const result = passwordSchema.safeParse(req.body);
+    if (!result.success) throw badRequest(result.error.issues[0]?.message ?? "Invalid request");
+    const rows = await AppDataSource.query("SELECT password_hash FROM superadmins WHERE id = $1", [req.platform!.superadminId]);
+    const row = rows[0];
+    if (!row || !(await checkPassword(result.data.currentPassword, row.password_hash))) {
+      throw unauthorized("Current password is wrong");
+    }
+    await AppDataSource.query("UPDATE superadmins SET password_hash = $2 WHERE id = $1", [
+      req.platform!.superadminId,
+      await hashPassword(result.data.newPassword),
+    ]);
+    res.json({ ok: true });
+  }),
+);
 
 adminRouter.get(
   "/overview",

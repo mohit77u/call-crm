@@ -30,7 +30,7 @@ export async function dashboard(companyId: number, f: CallFilters) {
         ORDER BY d.location_at DESC NULLS LAST LIMIT 1) AS location
      FROM agents a
      LEFT JOIN call_logs cl ON cl.agent_id = a.id AND ${where}
-     WHERE a.company_id = $1
+     WHERE a.company_id = $1 AND a.deleted_at IS NULL
      GROUP BY a.id ORDER BY talk_sec DESC, a.name`,
     params,
   );
@@ -50,9 +50,43 @@ export async function dashboard(companyId: number, f: CallFilters) {
   return { totals: totals[0] ?? null, prev: prev[0] ?? null, daily, agents };
 }
 
+// Same shape as dashboard() but scoped to a single agent — totals, daily and
+// previous-period stats all filter cl.agent_id, and the agents list contains
+// only that agent's row.
+export async function agentDashboard(companyId: number, agentId: number, f: CallFilters) {
+  const clean = { ...f, agent: String(agentId), status: "", q: "" };
+  const { where, params } = buildCompanyCallWhere(companyId, clean);
+  const totals = await AppDataSource.query(`SELECT ${SUMS} FROM call_logs cl WHERE ${where}`, params);
+  const agents = await AppDataSource.query(
+    `SELECT a.id, a.name, ${SUMS},
+       (SELECT max(d.last_sync_at) FROM devices d WHERE d.agent_id = a.id AND NOT d.revoked) AS last_sync_at,
+       (SELECT json_build_object('lat', d.last_lat, 'lng', d.last_lng, 'at', d.location_at)
+        FROM devices d WHERE d.agent_id = a.id AND NOT d.revoked AND d.last_lat IS NOT NULL
+        ORDER BY d.location_at DESC NULLS LAST LIMIT 1) AS location
+     FROM agents a
+     LEFT JOIN call_logs cl ON cl.agent_id = a.id AND ${where}
+     WHERE a.id = $5 AND a.company_id = $1 AND a.deleted_at IS NULL
+     GROUP BY a.id`,
+    params,
+  );
+  const daily = await AppDataSource.query(
+    `SELECT to_char(cl.started_at AT TIME ZONE $4, 'YYYY-MM-DD') AS day, count(*)::int AS total
+     FROM call_logs cl WHERE ${where} GROUP BY 1 ORDER BY 1`,
+    params,
+  );
+
+  const rangeDays = Math.max(1, Math.round((Date.parse(f.to) - Date.parse(f.from)) / 86400000) + 1);
+  const prevFrom = addDays(f.from, -rangeDays);
+  const prevTo = addDays(f.from, -1);
+  const prevWhere = buildCompanyCallWhere(companyId, { ...clean, from: prevFrom, to: prevTo });
+  const prev = await AppDataSource.query(`SELECT ${SUMS} FROM call_logs cl WHERE ${prevWhere.where}`, prevWhere.params);
+
+  return { totals: totals[0] ?? null, prev: prev[0] ?? null, daily, agents };
+}
+
 export async function listCalls(companyId: number, f: CallFilters, page: number, perPage = PAGE_SIZE) {
   const { where, params } = buildCompanyCallWhere(companyId, f);
-  const agents = await AppDataSource.query("SELECT id, name FROM agents WHERE company_id = $1 ORDER BY name", [companyId]);
+  const agents = await AppDataSource.query("SELECT id, name FROM agents WHERE company_id = $1 AND deleted_at IS NULL ORDER BY name", [companyId]);
   const summary = await AppDataSource.query(
     `SELECT count(*)::int AS total, COALESCE(sum(duration_sec), 0)::int AS talk_sec FROM call_logs cl WHERE ${where}`,
     params,
@@ -89,11 +123,11 @@ export async function exportCallsRows(companyId: number, f: CallFilters) {
 
 export async function platformListCalls(f: CallFilters, page: number, perPage = PAGE_SIZE) {
   const { where, params } = buildPlatformCallWhere(f);
-  const companies = await AppDataSource.query("SELECT id, name FROM companies ORDER BY name");
+  const companies = await AppDataSource.query("SELECT id, name FROM companies WHERE deleted_at IS NULL ORDER BY name");
   const agents = await AppDataSource.query(
     f.company
-      ? "SELECT id, name FROM agents WHERE company_id = $1 ORDER BY name"
-      : "SELECT id, name FROM agents ORDER BY name",
+      ? "SELECT id, name FROM agents WHERE company_id = $1 AND deleted_at IS NULL ORDER BY name"
+      : "SELECT id, name FROM agents WHERE deleted_at IS NULL ORDER BY name",
     f.company ? [Number(f.company)] : [],
   );
   const summary = await AppDataSource.query(

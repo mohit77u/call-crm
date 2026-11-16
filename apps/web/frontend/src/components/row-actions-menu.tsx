@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { notify } from "@/lib/notify";
@@ -19,23 +20,34 @@ type RowActionsMenuProps = {
 export function RowActionsMenu({ editHref, itemName, itemLabel = "item", deleteAction, deleteMessage, successMessage = "Deleted" }: RowActionsMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    const btn = ref.current?.querySelector("button");
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: Math.max(8, r.right - 160) });
+    }
     function onClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    const close = () => setOpen(false);
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", onClick);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
     };
   }, [open]);
 
@@ -52,29 +64,35 @@ export function RowActionsMenu({ editHref, itemName, itemLabel = "item", deleteA
         <Ellipsis size={20} strokeWidth={2.5} />
       </button>
 
-      {open && (
-        <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
-          <Link
-            href={editHref}
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+      {open && pos &&
+        createPortal(
+          <div
+            role="menu"
+            style={{ position: "fixed", top: pos.top, left: pos.left }}
+            className="z-50 w-40 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg"
           >
-            <Pencil size={14} className="text-slate-400" /> Edit
-          </Link>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              setConfirmOpen(true);
-            }}
-            className="flex w-full items-center gap-2 rounded-none border-0 bg-red-50 px-3 py-2 text-left text-sm text-red-500 shadow-none"
-          >
-            <Trash2 size={14} className="text-red-400" /> Delete
-          </button>
-        </div>
-      )}
+            <Link
+              href={editHref}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <Pencil size={14} className="text-slate-400" /> Edit
+            </Link>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                setConfirmOpen(true);
+              }}
+              className="flex w-full items-center gap-2 rounded-none border-0 bg-red-50 px-3 py-2 text-left text-sm text-red-500 shadow-none"
+            >
+              <Trash2 size={14} className="text-red-400" /> Delete
+            </button>
+          </div>,
+          document.body,
+        )}
 
       <ConfirmDialog
         open={confirmOpen}

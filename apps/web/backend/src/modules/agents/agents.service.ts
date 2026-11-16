@@ -6,7 +6,7 @@ import type { AdminContext } from "../../middleware/auth";
 
 export async function listAgentsWithDevices(companyId: number) {
   const agents = await AppDataSource.query(
-    "SELECT id, name, username, phone, active FROM agents WHERE company_id = $1 ORDER BY name",
+    "SELECT id, name, username, phone, active FROM agents WHERE company_id = $1 AND deleted_at IS NULL ORDER BY name",
     [companyId],
   );
   const devices = await AppDataSource.query(
@@ -20,10 +20,10 @@ export async function createAgent(admin: AdminContext, input: { name: string; us
   const company = await getOr404(admin.companyId);
   const limit = agentLimit(company);
   if (limit !== null) {
-    const rows = await AppDataSource.query("SELECT count(*)::int AS n FROM agents WHERE company_id = $1", [admin.companyId]);
+    const rows = await AppDataSource.query("SELECT count(*)::int AS n FROM agents WHERE company_id = $1 AND deleted_at IS NULL", [admin.companyId]);
     if (rows[0].n >= limit) throw forbidden("Agent limit reached for your plan. Contact support to upgrade.");
   }
-  const exists = await AppDataSource.query("SELECT 1 FROM agents WHERE company_id = $1 AND username = $2", [
+  const exists = await AppDataSource.query("SELECT 1 FROM agents WHERE company_id = $1 AND username = $2 AND deleted_at IS NULL", [
     admin.companyId,
     input.username,
   ]);
@@ -37,7 +37,7 @@ export async function createAgent(admin: AdminContext, input: { name: string; us
 
 export async function setAgentActive(companyId: number, agentId: number, active: boolean) {
   const rows = returnedRows(
-    await AppDataSource.query("UPDATE agents SET active = $3 WHERE id = $1 AND company_id = $2 RETURNING id", [
+    await AppDataSource.query("UPDATE agents SET active = $3 WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL RETURNING id", [
       agentId,
       companyId,
       active,
@@ -49,7 +49,7 @@ export async function setAgentActive(companyId: number, agentId: number, active:
 
 export async function resetAgentPassword(companyId: number, agentId: number, password: string) {
   const rows = returnedRows(
-    await AppDataSource.query("UPDATE agents SET password_hash = $3 WHERE id = $1 AND company_id = $2 RETURNING id", [
+    await AppDataSource.query("UPDATE agents SET password_hash = $3 WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL RETURNING id", [
       agentId,
       companyId,
       await hashPassword(password),
@@ -60,14 +60,14 @@ export async function resetAgentPassword(companyId: number, agentId: number, pas
 }
 
 export async function deleteAgent(companyId: number, agentId: number) {
-  // devices and call_logs cascade via FK ON DELETE CASCADE
   const rows = returnedRows(
-    await AppDataSource.query("DELETE FROM agents WHERE id = $1 AND company_id = $2 RETURNING id", [
-      agentId,
-      companyId,
-    ]),
+    await AppDataSource.query(
+      "UPDATE agents SET deleted_at = now(), active = false WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL RETURNING id",
+      [agentId, companyId],
+    ),
   );
   if (rows.length === 0) throw notFound("Agent not found");
+  await AppDataSource.query("UPDATE devices SET revoked = true WHERE agent_id = $1 AND NOT revoked", [agentId]);
   return { ok: true };
 }
 

@@ -19,18 +19,18 @@ export async function overview(q: string) {
     where = `(c.name ILIKE $1 OR c.client_code ILIKE $1 OR COALESCE(a.email, '') ILIKE $1)`;
   }
   const totals = await AppDataSource.query(
-    `SELECT (SELECT count(*)::int FROM companies) AS companies,
-            (SELECT count(*)::int FROM agents) AS agents,
+    `SELECT (SELECT count(*)::int FROM companies WHERE deleted_at IS NULL) AS companies,
+            (SELECT count(*)::int FROM agents WHERE deleted_at IS NULL) AS agents,
             (SELECT count(*)::int FROM call_logs) AS calls`,
   );
   const companies = await AppDataSource.query(
     `SELECT c.id, c.name, c.client_code, c.features, c.plan, c.created_at,
-       (SELECT a.email FROM admins a WHERE a.company_id = c.id ORDER BY a.id LIMIT 1) AS admin_email,
-       (SELECT count(*)::int FROM agents ag WHERE ag.company_id = c.id) AS agents,
+       (SELECT string_agg(a.email, E'\n' ORDER BY a.id) FROM admins a WHERE a.company_id = c.id AND a.deleted_at IS NULL) AS admin_email,
+       (SELECT count(*)::int FROM agents ag WHERE ag.company_id = c.id AND ag.deleted_at IS NULL) AS agents,
        (SELECT count(*)::int FROM call_logs cl WHERE cl.company_id = c.id) AS calls
      FROM companies c
-     LEFT JOIN LATERAL (SELECT email FROM admins WHERE company_id = c.id ORDER BY id LIMIT 1) a ON true
-     WHERE ${where}
+     LEFT JOIN LATERAL (SELECT email FROM admins WHERE company_id = c.id AND deleted_at IS NULL ORDER BY id LIMIT 1) a ON true
+     WHERE c.deleted_at IS NULL AND ${where}
      ORDER BY c.created_at DESC`,
     params,
   );
@@ -38,12 +38,12 @@ export async function overview(q: string) {
 }
 
 export async function listCompanies() {
-  return AppDataSource.query("SELECT id, name FROM companies ORDER BY name");
+  return AppDataSource.query("SELECT id, name FROM companies WHERE deleted_at IS NULL ORDER BY name");
 }
 
 export async function listAgents(company: string, q: string) {
   const params: unknown[] = [];
-  const where = ["true"];
+  const where = ["a.deleted_at IS NULL", "c.deleted_at IS NULL"];
   if (company) {
     params.push(Number(company));
     where.push(`a.company_id = $${params.length}`);
@@ -66,11 +66,11 @@ export async function listAgents(company: string, q: string) {
 export async function companyDetail(id: number) {
   const company = await getOr404(id);
   const admins = await AppDataSource.query(
-    "SELECT id, name, email, created_at AS \"createdAt\" FROM admins WHERE company_id = $1 ORDER BY id",
+    "SELECT id, name, email, created_at AS \"createdAt\" FROM admins WHERE company_id = $1 AND deleted_at IS NULL ORDER BY id",
     [id],
   );
   const counts = await AppDataSource.query(
-    `SELECT (SELECT count(*)::int FROM agents WHERE company_id = $1) AS agents,
+    `SELECT (SELECT count(*)::int FROM agents WHERE company_id = $1 AND deleted_at IS NULL) AS agents,
             (SELECT count(*)::int FROM call_logs WHERE company_id = $1) AS calls,
             (SELECT count(*)::int FROM devices WHERE company_id = $1 AND NOT revoked) AS devices`,
     [id],
@@ -92,7 +92,7 @@ export async function createCompany(input: {
   const emails = admins.map((a) => a.email);
   if (new Set(emails).size !== emails.length) throw badRequest("Admin emails must be unique");
   for (const email of emails) {
-    const existing = await AppDataSource.query("SELECT 1 FROM admins WHERE email = $1", [email]);
+    const existing = await AppDataSource.query("SELECT 1 FROM admins WHERE email = $1 AND deleted_at IS NULL", [email]);
     if (existing.length > 0) throw badRequest("This email is already registered");
   }
   const { company, clientCode } = await createCompanyWithAdmins({ ...input, admins });
@@ -108,8 +108,8 @@ export async function updateAdmins(id: number, input: { upserts: { id?: number; 
 }
 
 export async function deleteCompany(id: number) {
-  // admins, agents, devices and call_logs all cascade via company_id FK.
-  const rows = await AppDataSource.query("DELETE FROM companies WHERE id = $1 RETURNING id", [id]);
+  // Soft delete — admins, agents, devices, call_logs and leads are kept.
+  const rows = await AppDataSource.query("UPDATE companies SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL RETURNING id", [id]);
   if (rows.length === 0) throw notFound("Company not found");
   return { ok: true };
 }
@@ -125,13 +125,13 @@ export async function exportCompaniesRows(q: string) {
   }
   return AppDataSource.query(
     `SELECT c.name, c.client_code, c.plan,
-       (SELECT a.email FROM admins a WHERE a.company_id = c.id ORDER BY a.id LIMIT 1) AS admin_email,
-       (SELECT count(*)::int FROM agents ag WHERE ag.company_id = c.id) AS agents,
+       (SELECT string_agg(a.email, E'\n' ORDER BY a.id) FROM admins a WHERE a.company_id = c.id AND a.deleted_at IS NULL) AS admin_email,
+       (SELECT count(*)::int FROM agents ag WHERE ag.company_id = c.id AND ag.deleted_at IS NULL) AS agents,
        (SELECT count(*)::int FROM call_logs cl WHERE cl.company_id = c.id) AS calls,
        to_char(c.created_at AT TIME ZONE $1, 'YYYY-MM-DD HH24:MI:SS') AS created
      FROM companies c
-     LEFT JOIN LATERAL (SELECT email FROM admins WHERE company_id = c.id ORDER BY id LIMIT 1) a ON true
-     WHERE ${where}
+     LEFT JOIN LATERAL (SELECT email FROM admins WHERE company_id = c.id AND deleted_at IS NULL ORDER BY id LIMIT 1) a ON true
+     WHERE c.deleted_at IS NULL AND ${where}
      ORDER BY c.created_at DESC`,
     params,
   );
@@ -139,7 +139,7 @@ export async function exportCompaniesRows(q: string) {
 
 export async function exportAgentsRows(company: string, q: string) {
   const params: unknown[] = [TIME_ZONE];
-  const where = ["true"];
+  const where = ["a.deleted_at IS NULL", "c.deleted_at IS NULL"];
   if (company) {
     params.push(Number(company));
     where.push(`a.company_id = $${params.length}`);

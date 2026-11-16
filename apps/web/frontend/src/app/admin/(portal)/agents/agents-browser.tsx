@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { formatDateTime } from "@/lib/calls";
 import { SearchInput } from "@/components/search-input";
+import { AppSelect } from "@/components/app-select";
 import { DataTable } from "@/components/data-table";
 import { takeNavState } from "@/lib/nav-state";
 
@@ -49,17 +49,15 @@ export function AgentsBrowser({ agents, companies }: { agents: AgentRow[]; compa
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <SearchInput value={q} onSearch={setQ} placeholder="Search" className="w-full max-w-xs" />
-          <div className="relative">
-            <select
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              className="h-9 appearance-none rounded-md border border-slate-300 bg-white py-0 pl-3 pr-8 text-sm leading-9 text-slate-700 focus:border-[var(--primary)] focus:outline-none"
-            >
-              <option value="">All Companies</option>
-              {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          </div>
+          <AppSelect
+            className="w-52"
+            value={company || "__all__"}
+            onChange={(v) => setCompany(v === "__all__" ? "" : (v ?? ""))}
+            data={[
+              { value: "__all__", label: "All Companies" },
+              ...companies.map((c) => ({ value: String(c.id), label: c.name })),
+            ]}
+          />
         </div>
         <div className="flex items-center gap-2">
           <a className="btn secondary" href={`/api/admin/agents/export?${exportQs}`}>Export CSV</a>

@@ -71,13 +71,17 @@ export function PasswordField({ label = "Password", error, onClearError, onChang
   );
 }
 
-export function SelectField({ label, error, onClearError, onChange, ...rest }: CommonProps & Omit<SelectProps, "name" | "label" | "error">) {
+export function SelectField({ label, error, onClearError, onChange, withCheckIcon = true, withAlignedLabels = true, checkIconPosition = "left", scrollAreaProps = { mah: 180, type: "auto", scrollbars: "y" }, ...rest }: CommonProps & Omit<SelectProps, "name" | "label" | "error">) {
   return (
     <Select
       {...rest}
       label={label}
       error={error}
       withErrorStyles={false}
+      withCheckIcon={withCheckIcon}
+      withAlignedLabels={withAlignedLabels}
+      checkIconPosition={checkIconPosition}
+      scrollAreaProps={scrollAreaProps}
       onChange={wrapChange(onChange, onClearError)}
     />
   );

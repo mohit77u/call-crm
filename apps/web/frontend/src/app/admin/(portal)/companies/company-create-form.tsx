@@ -20,6 +20,7 @@ export function CompanyCreateForm() {
   const [state, formAction, pending] = useActionState(createCompany, {});
   const [, startTransition] = useTransition();
   const [planState, setPlanState] = useState<PlanFormState>(() => stateFromPlan("basic"));
+  const [minAdminMsg, setMinAdminMsg] = useState(false);
   const {
     control,
     handleSubmit,
@@ -95,30 +96,36 @@ export function CompanyCreateForm() {
             <button
               type="button"
               disabled={fields.length >= MAX_ADMINS}
-              onClick={() => append({ name: "", email: "", password: "" })}
+              onClick={() => {
+                append({ name: "", email: "", password: "" });
+                setMinAdminMsg(false);
+              }}
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
             >
-              <Plus size={14} /> Add admin
+              <Plus size={14} /> Add Admin
             </button>
           </div>
           {typeof errors.admins?.message === "string" && (
             <p className="mt-2 text-xs text-red-500">{errors.admins.message}</p>
           )}
-          <div className="mt-3 flex flex-col gap-4">
+          <div className="mt-3 flex flex-col gap-3">
             {fields.map((f, i) => (
-              <div key={f.id} className="rounded-lg border border-slate-200 p-4">
-                <div className="mb-3 flex items-center justify-between">
+              <div key={f.id} className="rounded-lg border border-slate-200 p-3">
+                <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500">Admin {i + 1}</span>
-                  {fields.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => remove(i)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-500"
-                      aria-label="Remove admin"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      remove(i);
+                      if (fields.length - 1 === 1) setMinAdminMsg(true);
+                    }}
+                    disabled={fields.length <= 1}
+                    className="inline-flex items-center justify-center rounded-md bg-transparent p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Remove admin"
+                    title={fields.length <= 1 ? "At least one admin is required" : undefined}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <Controller
@@ -170,6 +177,9 @@ export function CompanyCreateForm() {
               </div>
             ))}
           </div>
+          {minAdminMsg && fields.length === 1 && (
+            <p className="mt-2 text-xs font-medium text-red-500">At least one admin is required</p>
+          )}
         </section>
 
         <section className="border-t border-slate-100 pt-5">

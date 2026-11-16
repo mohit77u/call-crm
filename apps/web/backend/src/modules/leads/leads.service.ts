@@ -1,6 +1,7 @@
 import { AppDataSource, returnedRows } from "../../database";
 import { badRequest, notFound } from "../../shared/errors";
 import { isLeadStatus } from "../../shared/leads";
+import { notifyAdmins, notifyAgents } from "../notifications/notifications.service";
 import type { AdminContext, AgentContext } from "../../middleware/auth";
 
 const COLS = `id, company_id AS "companyId", assigned_agent_id AS "assignedAgentId",
@@ -21,23 +22,22 @@ function str(v: unknown, max = 500) {
   return v == null ? null : String(v).slice(0, max);
 }
 
-const PHONE_RE = /^[6-9]\d{9}$/;
-
-// Indian mobile: exactly 10 digits starting 6-9. Accepts +91/0 prefixes and
-// formatting, stores normalized 10-digit number. Empty -> null.
+// Phone is stored as exactly 10 digits: non-digits are stripped and the last
+// 10 digits are kept (handles +91/0 prefixes and formatting). Fewer than 10
+// digits -> null.
 function normalizePhone(v: unknown): string | null {
   if (v == null) return null;
-  let d = String(v).replace(/\D/g, "");
-  if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
-  else if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
-  if (!d) return null;
-  if (!PHONE_RE.test(d)) throw badRequest("Enter a valid 10-digit Indian phone number");
-  return d;
+  const d = String(v).replace(/\D/g, "");
+  return d.length >= 10 ? d.slice(-10) : null;
+}
+
+function withNormalizedPhones<T extends { phone?: unknown }>(rows: T[]): T[] {
+  return rows.map((r) => ({ ...r, phone: normalizePhone(r.phone) }));
 }
 
 async function assertAgentInCompany(companyId: number, agentId: number) {
   const rows = await AppDataSource.query(
-    "SELECT id FROM agents WHERE id = $1 AND company_id = $2 AND active",
+    "SELECT id FROM agents WHERE id = $1 AND company_id = $2 AND active AND deleted_at IS NULL",
     [agentId, companyId],
   );
   if (!rows[0]) throw badRequest("Agent not found or inactive");
@@ -46,7 +46,7 @@ async function assertAgentInCompany(companyId: number, agentId: number) {
 async function assertPhoneAvailable(companyId: number, phone: string | null, excludeId?: number) {
   if (!phone) return;
   const rows = await AppDataSource.query(
-    "SELECT id FROM leads WHERE company_id = $1 AND phone = $2 AND ($3::int IS NULL OR id <> $3) LIMIT 1",
+    "SELECT id FROM leads WHERE company_id = $1 AND phone = $2 AND deleted_at IS NULL AND ($3::int IS NULL OR id <> $3) LIMIT 1",
     [companyId, phone, excludeId ?? null],
   );
   if (rows[0]) throw badRequest("A lead with this phone number already exists");
@@ -55,42 +55,37 @@ async function assertPhoneAvailable(companyId: number, phone: string | null, exc
 // ---------- Agent side ----------
 
 export async function agentListLeads(agent: AgentContext) {
-  return AppDataSource.query(
+  const rows = await AppDataSource.query(
     `SELECT ${COLS} FROM leads
-     WHERE company_id = $1 AND assigned_agent_id = $2
-     ORDER BY updated_at DESC LIMIT 500`,
+     WHERE company_id = $1 AND assigned_agent_id = $2 AND deleted_at IS NULL
+     ORDER BY created_at DESC, id DESC LIMIT 500`,
     [agent.companyId, agent.agentId],
   );
+  return withNormalizedPhones(rows);
 }
 
-export async function agentCreateRequest(agent: AgentContext, input: { name: string; phone?: string | null; email?: string | null; notes?: string | null }) {
-  const name = input.name.trim();
-  if (!name) throw badRequest("Name is required");
-  const phone = normalizePhone(input.phone);
-  await assertPhoneAvailable(agent.companyId, phone);
-  const rows = await AppDataSource.query(
-    `INSERT INTO leads (company_id, assigned_agent_id, requested_by_agent_id, created_by_type, created_by_id, source, name, phone, email, notes, status, request_status)
-     VALUES ($1, NULL, $2, 'agent', $2, 'request', $3, $4, $5, $6, 'new', 'pending')
-     RETURNING ${COLS}`,
-    [agent.companyId, agent.agentId, name, phone, str(input.email, 200), str(input.notes)],
-  );
-  return rows[0];
+// Agent lead request is just a notification to company admins — the admin
+// decides how many leads to assign and to whom.
+export async function agentRequestLeads(agent: AgentContext) {
+  await notifyAdmins(agent.companyId, "lead_request", `${agent.name} has requested leads`, "/company/leads");
+  return { requested: true };
 }
 
 export async function agentMyRequests(agent: AgentContext) {
-  return AppDataSource.query(
+  const rows = await AppDataSource.query(
     `SELECT ${COLS} FROM leads
-     WHERE company_id = $1 AND requested_by_agent_id = $2 AND request_status IS NOT NULL
+     WHERE company_id = $1 AND requested_by_agent_id = $2 AND request_status IS NOT NULL AND deleted_at IS NULL
      ORDER BY created_at DESC LIMIT 100`,
     [agent.companyId, agent.agentId],
   );
+  return withNormalizedPhones(rows);
 }
 
 // ---------- Admin (company) side ----------
 
 export async function agentUpdateLead(agent: AgentContext, id: number, patch: Record<string, unknown>) {
   const rows = await AppDataSource.query(
-    `SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND assigned_agent_id = $3`,
+    `SELECT id FROM leads WHERE id = $1 AND company_id = $2 AND assigned_agent_id = $3 AND deleted_at IS NULL`,
     [id, agent.companyId, agent.agentId],
   );
   if (!rows[0]) throw notFound("Lead not found");
@@ -126,7 +121,7 @@ export async function agentUpdateLead(agent: AgentContext, id: number, patch: Re
   if (sets.length === 0) throw badRequest("Nothing to update");
   sets.push("updated_at = now()");
   const updated = await AppDataSource.query(
-    `UPDATE leads SET ${sets.join(", ")} WHERE id = $1 AND company_id = $2 AND assigned_agent_id = $3 RETURNING ${COLS}`,
+    `UPDATE leads SET ${sets.join(", ")} WHERE id = $1 AND company_id = $2 AND assigned_agent_id = $3 AND deleted_at IS NULL RETURNING ${COLS}`,
     params,
   );
   return returnedRows(updated)[0];
@@ -147,11 +142,11 @@ function pushDateFilters(where: string[], params: unknown[], filters: { createdF
 
 export async function adminListLeads(
   admin: AdminContext,
-  filters: { agent?: string; status?: string; q?: string; createdFrom?: string; createdTo?: string },
+  filters: { agent?: string; status?: string; q?: string; accountCreated?: string; createdFrom?: string; createdTo?: string },
   page: number,
   perPage: number,
 ) {
-  const where = ["l.company_id = $1", "(l.request_status IS NULL OR l.request_status = 'approved')"];
+  const where = ["l.company_id = $1", "l.deleted_at IS NULL", "(l.request_status IS NULL OR l.request_status = 'approved')"];
   const params: unknown[] = [admin.companyId];
   if (filters.agent === "unassigned") {
     where.push("l.assigned_agent_id IS NULL");
@@ -162,6 +157,11 @@ export async function adminListLeads(
   if (filters.status && isLeadStatus(filters.status)) {
     params.push(filters.status);
     where.push(`l.status = $${params.length}`);
+  }
+  if (filters.accountCreated === "yes") {
+    where.push("l.account_created");
+  } else if (filters.accountCreated === "no") {
+    where.push("NOT l.account_created");
   }
   if (filters.q) {
     params.push(`%${filters.q}%`);
@@ -179,13 +179,15 @@ export async function adminListLeads(
   const limitIdx = params.length + 1;
   const offsetIdx = params.length + 2;
   params.push(perPage, (safePage - 1) * perPage);
-  const leads = await AppDataSource.query(
-    `SELECT ${COLS_L}, a.name AS "agentName"
-     FROM leads l LEFT JOIN agents a ON a.id = l.assigned_agent_id
-     WHERE ${whereSql}
-     ORDER BY l.updated_at DESC
-     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-    params,
+  const leads = withNormalizedPhones(
+    await AppDataSource.query(
+      `SELECT ${COLS_L}, a.name AS "agentName"
+       FROM leads l LEFT JOIN agents a ON a.id = l.assigned_agent_id
+       WHERE ${whereSql}
+       ORDER BY l.created_at DESC, l.id DESC
+       LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+      params,
+    ),
   );
   return { leads, total, page: safePage, pages, perPage };
 }
@@ -199,6 +201,7 @@ export async function adminCreateLead(
   if (input.status && !isLeadStatus(input.status)) throw badRequest("Invalid status");
   if (input.assignedAgentId) await assertAgentInCompany(admin.companyId, input.assignedAgentId);
   const phone = normalizePhone(input.phone);
+  if (!phone) throw badRequest("Enter a valid phone number");
   await assertPhoneAvailable(admin.companyId, phone);
   const rows = await AppDataSource.query(
     `INSERT INTO leads (company_id, assigned_agent_id, requested_by_agent_id, created_by_type, created_by_id, source, name, phone, email, notes, status, request_status, assigned_at)
@@ -215,15 +218,20 @@ export async function adminCreateLead(
       input.status && isLeadStatus(input.status) ? input.status : "new",
     ],
   );
+  if (input.assignedAgentId) {
+    await notifyAgents(admin.companyId, [input.assignedAgentId], "leads_assigned", "1 new lead assigned to you", "/agent/leads");
+  }
   return rows[0];
 }
 
 export async function adminUpdateLead(admin: AdminContext, id: number, patch: Record<string, unknown>) {
   const rows = await AppDataSource.query(
-    `SELECT id FROM leads WHERE id = $1 AND company_id = $2`,
+    `SELECT id, assigned_agent_id AS "assignedAgentId" FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
     [id, admin.companyId],
   );
   if (!rows[0]) throw notFound("Lead not found");
+  const previousAgentId = rows[0].assignedAgentId as number | null;
+  let newlyAssignedAgentId: number | null = null;
 
   const sets: string[] = [];
   const params: unknown[] = [id, admin.companyId];
@@ -239,6 +247,7 @@ export async function adminUpdateLead(admin: AdminContext, id: number, patch: Re
   }
   if ("phone" in patch) {
     const phone = normalizePhone(patch.phone);
+    if (!phone) throw badRequest("Enter a valid phone number");
     await assertPhoneAvailable(admin.companyId, phone, id);
     push("phone", phone);
   }
@@ -258,6 +267,7 @@ export async function adminUpdateLead(admin: AdminContext, id: number, patch: Re
     if (agentId != null) {
       if (!Number.isInteger(agentId)) throw badRequest("Invalid agent");
       await assertAgentInCompany(admin.companyId, agentId);
+      if (agentId !== previousAgentId) newlyAssignedAgentId = agentId;
     }
     push("assigned_agent_id", agentId);
     params.push(agentId);
@@ -267,20 +277,74 @@ export async function adminUpdateLead(admin: AdminContext, id: number, patch: Re
   if (sets.length === 0) throw badRequest("Nothing to update");
   sets.push("updated_at = now()");
   const updated = await AppDataSource.query(
-    `UPDATE leads SET ${sets.join(", ")} WHERE id = $1 AND company_id = $2 RETURNING ${COLS}`,
+    `UPDATE leads SET ${sets.join(", ")} WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL RETURNING ${COLS}`,
     params,
   );
+  if (newlyAssignedAgentId) {
+    await notifyAgents(admin.companyId, [newlyAssignedAgentId], "leads_assigned", "1 new lead assigned to you", "/agent/leads");
+  }
   return returnedRows(updated)[0];
 }
 
+export async function adminDeleteLead(admin: AdminContext, id: number) {
+  const rows = await AppDataSource.query(
+    "UPDATE leads SET deleted_at = now(), updated_at = now() WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL RETURNING id",
+    [id, admin.companyId],
+  );
+  if (!rows[0]) throw notFound("Lead not found");
+  return { deleted: true };
+}
+
+// Assigns leads to an agent. When `leadIds` is given, exactly those leads are
+// assigned; otherwise up to `count` random unassigned leads are assigned (all
+// available ones when fewer remain).
+export async function adminAssignLeads(admin: AdminContext, agentId: number, count: number, leadIds?: number[]) {
+  await assertAgentInCompany(admin.companyId, agentId);
+  if (leadIds && leadIds.length > 0) {
+    const rows = returnedRows<{ id: number }>(
+      await AppDataSource.query(
+        `UPDATE leads
+         SET assigned_agent_id = $3, assigned_at = now(), updated_at = now()
+         WHERE company_id = $1 AND id = ANY($2::int[]) AND deleted_at IS NULL
+         RETURNING id`,
+        [admin.companyId, leadIds, agentId],
+      ),
+    );
+    if (rows.length > 0) {
+      await notifyAgents(admin.companyId, [agentId], "leads_assigned", `${rows.length} new lead${rows.length === 1 ? "" : "s"} assigned to you`, "/agent/leads");
+    }
+    return { assigned: rows.length, requested: leadIds.length };
+  }
+  const rows = returnedRows<{ id: number }>(
+    await AppDataSource.query(
+      `UPDATE leads
+       SET assigned_agent_id = $3, assigned_at = now(), updated_at = now()
+       WHERE id IN (
+         SELECT id FROM leads
+         WHERE company_id = $1 AND assigned_agent_id IS NULL AND deleted_at IS NULL
+           AND (request_status IS NULL OR request_status = 'approved')
+         ORDER BY random()
+         LIMIT $2
+       )
+       RETURNING id`,
+      [admin.companyId, count, agentId],
+    ),
+  );
+  if (rows.length > 0) {
+    await notifyAgents(admin.companyId, [agentId], "leads_assigned", `${rows.length} new lead${rows.length === 1 ? "" : "s"} assigned to you`, "/agent/leads");
+  }
+  return { assigned: rows.length, requested: count };
+}
+
 export async function adminListRequests(admin: AdminContext) {
-  return AppDataSource.query(
+  const rows = await AppDataSource.query(
     `SELECT ${COLS_L}, a.name AS "agentName"
      FROM leads l LEFT JOIN agents a ON a.id = l.requested_by_agent_id
-     WHERE l.company_id = $1 AND l.request_status = 'pending'
+     WHERE l.company_id = $1 AND l.request_status = 'pending' AND l.deleted_at IS NULL
      ORDER BY l.created_at ASC`,
     [admin.companyId],
   );
+  return withNormalizedPhones(rows);
 }
 
 export async function adminApproveRequest(admin: AdminContext, id: number, agentId: number) {
@@ -288,16 +352,17 @@ export async function adminApproveRequest(admin: AdminContext, id: number, agent
   const rows = returnedRows(
     await AppDataSource.query(
       `UPDATE leads SET request_status = 'approved', assigned_agent_id = $3, assigned_at = now(), status = 'new', updated_at = now()
-       WHERE id = $1 AND company_id = $2 AND request_status = 'pending' RETURNING ${COLS}`,
+       WHERE id = $1 AND company_id = $2 AND request_status = 'pending' AND deleted_at IS NULL RETURNING ${COLS}`,
       [id, admin.companyId, agentId],
     ),
   );
   if (rows.length === 0) throw notFound("Pending request not found");
+  await notifyAgents(admin.companyId, [agentId], "leads_assigned", "1 new lead assigned to you", "/agent/leads");
   return rows[0];
 }
 
-export async function adminExportLeadsRows(admin: AdminContext, filters: { agent?: string; status?: string; q?: string; createdFrom?: string; createdTo?: string }) {
-  const where = ["l.company_id = $1", "(l.request_status IS NULL OR l.request_status = 'approved')"];
+export async function adminExportLeadsRows(admin: AdminContext, filters: { agent?: string; status?: string; q?: string; accountCreated?: string; createdFrom?: string; createdTo?: string }) {
+  const where = ["l.company_id = $1", "l.deleted_at IS NULL", "(l.request_status IS NULL OR l.request_status = 'approved')"];
   const params: unknown[] = [admin.companyId];
   if (filters.agent === "unassigned") {
     where.push("l.assigned_agent_id IS NULL");
@@ -309,21 +374,27 @@ export async function adminExportLeadsRows(admin: AdminContext, filters: { agent
     params.push(filters.status);
     where.push(`l.status = $${params.length}`);
   }
+  if (filters.accountCreated === "yes") {
+    where.push("l.account_created");
+  } else if (filters.accountCreated === "no") {
+    where.push("NOT l.account_created");
+  }
   if (filters.q) {
     params.push(`%${filters.q}%`);
     where.push(`(l.name ILIKE $${params.length} OR l.phone ILIKE $${params.length} OR l.email ILIKE $${params.length} OR l.notes ILIKE $${params.length})`);
   }
   pushDateFilters(where, params, filters);
-  return AppDataSource.query(
+  const rows = await AppDataSource.query(
     `SELECT l.name, l.phone, l.email, COALESCE(a.name, '') AS agent, l.status,
             l.account_created AS "accountCreated", COALESCE(l.notes, '') AS notes,
             l.created_at AS "createdAt", l.updated_at AS "updatedAt"
      FROM leads l LEFT JOIN agents a ON a.id = l.assigned_agent_id
      WHERE ${where.join(" AND ")}
-     ORDER BY l.updated_at DESC
+     ORDER BY l.created_at DESC, l.id DESC
      LIMIT 10000`,
     params,
   );
+  return withNormalizedPhones(rows);
 }
 
 const MAX_IMPORT_ROWS = 5000;
@@ -351,7 +422,7 @@ export async function adminImportLeads(
     assignAgentId = input.assignment.agentId;
   } else if (input.assignment?.mode === "roundrobin" || input.assignment?.mode === "random") {
     const agents = await AppDataSource.query(
-      "SELECT id FROM agents WHERE company_id = $1 AND active ORDER BY id",
+      "SELECT id FROM agents WHERE company_id = $1 AND active AND deleted_at IS NULL ORDER BY id",
       [admin.companyId],
     );
     roundRobin = agents.map((a: { id: number }) => a.id);
@@ -361,7 +432,7 @@ export async function adminImportLeads(
   const existingPhones = new Set(
     (
       await AppDataSource.query(
-        "SELECT phone FROM leads WHERE company_id = $1 AND phone IS NOT NULL AND phone <> ''",
+        "SELECT phone FROM leads WHERE company_id = $1 AND phone IS NOT NULL AND phone <> '' AND deleted_at IS NULL",
         [admin.companyId],
       )
     ).map((r: { phone: string }) => r.phone),
@@ -377,13 +448,7 @@ export async function adminImportLeads(
   try {
     for (const row of raw) {
       if (!Array.isArray(row)) continue;
-      let phone: string | null = null;
-      try {
-        phone = normalizePhone(cell(row, m.phone, 50));
-      } catch {
-        skipped++;
-        continue;
-      }
+      const phone = normalizePhone(cell(row, m.phone, 50));
       const name = (nameIdx >= 0 ? cell(row, nameIdx, 200) : null) || phone;
       if (!name) {
         skipped++;
@@ -426,7 +491,7 @@ export async function adminRejectRequest(admin: AdminContext, id: number, reason
       `UPDATE leads SET request_status = 'rejected',
          notes = CASE WHEN $3::text IS NULL THEN notes ELSE COALESCE(notes || E'\n', '') || '[Rejected] ' || $3 END,
          updated_at = now()
-       WHERE id = $1 AND company_id = $2 AND request_status = 'pending' RETURNING ${COLS}`,
+       WHERE id = $1 AND company_id = $2 AND request_status = 'pending' AND deleted_at IS NULL RETURNING ${COLS}`,
       [id, admin.companyId, note],
     ),
   );

@@ -46,7 +46,6 @@ export function PlanFields({ state, setState }: { state: PlanFormState; setState
           value={state.plan || null}
           onChange={(value) => applyPlan(String(value ?? ""))}
           allowDeselect={false}
-          withCheckIcon={false}
           size="sm"
         />
         <TextField

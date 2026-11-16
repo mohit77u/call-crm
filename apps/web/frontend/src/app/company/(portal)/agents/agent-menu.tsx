@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Ellipsis, KeyRound, Power, RefreshCw, Trash2, Unlink } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -38,21 +39,31 @@ export function AgentMenu({
   const [confirm, setConfirm] = useState<PendingAction | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current && !ref.current.contains(t) && !menuRef.current?.contains(t)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    function onScroll() {
+      setOpen(false);
+    }
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
     return () => {
       document.removeEventListener("mousedown", onClick);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
     };
   }, [open]);
 
@@ -72,7 +83,7 @@ export function AgentMenu({
   };
 
   const itemCls =
-    "flex w-full items-center gap-2 rounded-none border-0 bg-transparent px-3 py-2 text-left text-sm text-slate-600 shadow-none hover:bg-slate-50";
+    "flex w-full items-center gap-2 whitespace-nowrap rounded-none border-0 bg-transparent px-3 py-1.5 text-left text-[13px] text-slate-600 shadow-none hover:bg-slate-50";
 
   return (
     <div ref={ref} className="relative inline-block">
@@ -82,14 +93,26 @@ export function AgentMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={pending}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open && ref.current) {
+            const r = ref.current.getBoundingClientRect();
+            setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+          }
+          setOpen((o) => !o);
+        }}
         className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-transparent p-0! text-slate-600 shadow-none hover:bg-slate-100 hover:text-slate-800"
       >
         {pending ? <span className="text-xs">…</span> : <Ellipsis size={20} strokeWidth={2.5} />}
       </button>
 
-      {open && (
-        <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+      {open && menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ position: "fixed", top: menuPos.top, right: menuPos.right }}
+            className="z-50 w-44 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+          >
           <button
             type="button"
             role="menuitem"
@@ -157,7 +180,7 @@ export function AgentMenu({
           <button
             type="button"
             role="menuitem"
-            className="flex w-full items-center gap-2 rounded-none border-0 bg-red-50 px-3 py-2 text-left text-sm text-red-500 shadow-none"
+            className="flex w-full items-center gap-2 whitespace-nowrap rounded-none border-0 bg-red-50 px-3 py-1.5 text-left text-[13px] text-red-500 shadow-none"
             onClick={() =>
               ask({
                 title: "Delete agent?",
@@ -170,8 +193,9 @@ export function AgentMenu({
           >
             <Trash2 size={14} className="text-red-400" /> Delete agent
           </button>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
       <ConfirmDialog
         open={confirm != null}

@@ -49,36 +49,45 @@ export const agentLoginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-const indianPhone = z
+// Admin add/edit lead requires a phone number (at least 10 digits after stripping non-digits).
+const requiredPhone = z
   .string()
   .trim()
+  .min(1, "Phone is required")
   .max(20, "Phone must be 20 characters or less")
-  .refine(
-    (v) => {
-      if (!v) return true;
-      const d = v.replace(/\D/g, "");
-      const n = d.length === 12 && d.startsWith("91") ? d.slice(2) : d.length === 11 && d.startsWith("0") ? d.slice(1) : d;
-      return /^[6-9]\d{9}$/.test(n);
-    },
-    "Enter a valid 10-digit Indian phone number",
-  )
-  .optional();
-
-export const leadRequestSchema = z.object({
-  name: z.string().trim().min(1, "Name is required").max(200),
-  phone: indianPhone,
-  email: z.string().trim().email("Enter a valid email").max(200).or(z.literal("")).optional(),
-  notes: z.string().trim().max(2000).optional(),
-});
+  .refine((v) => v.replace(/\D/g, "").length >= 10, "Enter a valid phone number");
 
 export const leadFormSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
-  phone: indianPhone,
+  phone: requiredPhone,
   email: z.string().trim().email("Enter a valid email").max(200).or(z.literal("")).optional(),
   notes: z.string().trim().max(2000).optional(),
   status: z.string().optional(),
   assignedAgentId: z.string().optional(),
 });
+
+export const assignLeadsSchema = z.object({
+  count: z
+    .string()
+    .trim()
+    .min(1, "Enter how many leads to assign")
+    .regex(/^\d+$/, "Enter a valid number")
+    .refine((v) => Number(v) >= 1 && Number(v) <= 10000, "Enter between 1 and 10000"),
+  agentId: z.string().min(1, "Select an agent"),
+});
+
+export const profileFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100),
+  phone: z.string().trim().max(20, "Phone must be 20 characters or less").optional(),
+});
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters").max(100),
+    confirmPassword: z.string().min(1, "Confirm your password"),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, { message: "Passwords do not match", path: ["confirmPassword"] });
 
 export const createAgentSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
@@ -95,12 +104,26 @@ export const resetAgentPasswordSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters").max(100, "Password must be 100 characters or less"),
 });
 
+export const freeTrialFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  phone: requiredPhone,
+  days: z
+    .string()
+    .trim()
+    .min(1, "Days is required")
+    .regex(/^\d+$/, "Enter a valid number")
+    .refine((v) => Number(v) >= 1 && Number(v) <= 7, "Days must be between 1 and 7"),
+});
+
 export type LoginFormValues = z.infer<typeof loginFormSchema>;
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 export type CreateCompanyValues = z.infer<typeof createCompanySchema>;
 export type AgentLoginValues = z.infer<typeof agentLoginSchema>;
-export type LeadRequestValues = z.infer<typeof leadRequestSchema>;
 export type LeadFormValues = z.infer<typeof leadFormSchema>;
+export type AssignLeadsValues = z.infer<typeof assignLeadsSchema>;
+export type ProfileFormValues = z.infer<typeof profileFormSchema>;
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 export type CreateAgentValues = z.infer<typeof createAgentSchema>;
 export type ResetAgentPasswordValues = z.infer<typeof resetAgentPasswordSchema>;
+export type FreeTrialFormValues = z.infer<typeof freeTrialFormSchema>;

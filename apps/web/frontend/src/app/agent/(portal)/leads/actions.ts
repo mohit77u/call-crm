@@ -10,24 +10,10 @@ function fail(e: unknown, fallback: string): LeadActionState {
   return { error: e instanceof ApiError ? e.message : fallback };
 }
 
-export async function createLeadRequest(input: {
-  name: string;
-  phone?: string;
-  email?: string;
-  notes?: string;
-}): Promise<LeadActionState> {
+export async function requestLeads(): Promise<LeadActionState> {
   await requireAgent();
-  if (!input.name.trim()) return { error: "Name is required" };
   try {
-    await apiFetch("/api/agent/leads/requests", {
-      body: {
-        name: input.name.trim(),
-        phone: input.phone?.trim() || null,
-        email: input.email?.trim() || null,
-        notes: input.notes?.trim() || null,
-      },
-      token: await getAgentToken(),
-    });
+    await apiFetch("/api/agent/leads/requests", { body: {}, token: await getAgentToken() });
     return { notice: "Lead request sent to admin" };
   } catch (e) {
     return fail(e, "Could not send request");
