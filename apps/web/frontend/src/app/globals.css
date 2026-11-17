@@ -51,6 +51,7 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; color: var(--text); }
   position: sticky;
   top: 0;
   height: 100vh;
+  z-index: 60;
 }
 .sidebar .brand {
   color: #fff;
@@ -91,7 +92,7 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; color: var(--text); }
 .nav-backdrop { display: none; }
 .sidebar form { margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .sidebar button { width: 100%; }
-.main { flex: 1; padding: 16px 24px; overflow-x: auto; max-width: 1400px; margin-inline: auto; width: 100%; }
+.main { flex: 1; padding: 16px 24px; overflow-x: auto; width: 100%; }
 .main.admin-main { max-width: none; }
 
 /* ---------- Cards & stats ---------- */
@@ -331,7 +332,7 @@ button.danger:hover { background: #b91c1c; }
     background: rgba(15, 23, 42, 0.45);
     z-index: 70;
   }
-  .main { padding: 14px 14px 32px; }
+  .main { padding: 16px 16px 32px; }
   .dash-grid { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .stat { padding: 12px 14px; }
