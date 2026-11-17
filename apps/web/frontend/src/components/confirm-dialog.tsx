@@ -44,7 +44,7 @@ export function ConfirmDialog({
       onClick={() => !pending && onClose()}
     >
       <div
-        className="relative w-full max-w-sm whitespace-normal rounded-xl bg-white p-5 text-left shadow-xl"
+        className="relative w-full max-w-sm whitespace-normal rounded-xl bg-white p-5 text-left shadow-xl max-[420px]:p-4"
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
         aria-modal="true"

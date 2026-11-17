@@ -46,11 +46,11 @@ export function AgentsBrowser({ agents, companies }: { agents: AgentRow[]; compa
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <SearchInput value={q} onSearch={setQ} placeholder="Search" className="w-full max-w-xs" />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput value={q} onSearch={setQ} placeholder="Search" className="w-full sm:max-w-xs" />
           <AppSelect
-            className="w-52"
+            className="w-full sm:w-52"
             value={company || "__all__"}
             onChange={(v) => setCompany(v === "__all__" ? "" : (v ?? ""))}
             data={[

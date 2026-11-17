@@ -30,7 +30,8 @@ export function RowActionsMenu({ editHref, itemName, itemLabel = "item", deleteA
     const btn = ref.current?.querySelector("button");
     if (btn) {
       const r = btn.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: Math.max(8, r.right - 160) });
+      const left = Math.min(Math.max(8, r.right - 160), Math.max(8, window.innerWidth - 160 - 8));
+      setPos({ top: r.bottom + 4, left });
     }
     function onClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);

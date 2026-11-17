@@ -122,9 +122,9 @@ export function CrmTrialsBrowser({ agents }: { agents: AgentOption[] }) {
       </div>
 
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <SearchInput className="w-full max-w-xs" placeholder="Search" value={q} onSearch={setQ} />
+        <SearchInput className="w-full sm:max-w-xs" placeholder="Search" value={q} onSearch={setQ} />
         <AppSelect
-          className="w-44"
+          className="w-full sm:w-44"
           value={agentFilter || ALL}
           onChange={(v) => setAgentFilter(v === ALL ? "" : (v ?? ""))}
           data={[
@@ -133,7 +133,7 @@ export function CrmTrialsBrowser({ agents }: { agents: AgentOption[] }) {
           ]}
         />
         <AppSelect
-          className="w-36"
+          className="w-full sm:w-36"
           value={statusFilter || ALL}
           onChange={(v) => setStatusFilter(v === ALL ? "" : (v ?? ""))}
           data={[

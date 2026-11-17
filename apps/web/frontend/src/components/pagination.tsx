@@ -34,7 +34,7 @@ export function Pagination({ page, pages, total, perPage, onPage, onPerPageChang
       <span className="text-[13px] text-slate-500">
         Showing {from}–{to} of {total}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {onPerPageChange && (
           <label className="flex items-center gap-1.5 text-[13px] text-slate-500">
             Per page

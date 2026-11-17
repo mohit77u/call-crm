@@ -626,3 +626,32 @@ th { position: sticky; top: 0; background: #fff; }
   .site-actions { gap: 6px; }
   .site-actions .btn { padding: 7px 12px; font-size: 12.5px; }
 }
+
+/* ---------- Responsive: shared portal & auth (layered so Tailwind utilities can override) ---------- */
+@layer components {
+@media (max-width: 768px) {
+  .page-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .page-head .page-actions { width: 100%; }
+  .drawer { width: 280px; }
+  .stat { padding: 12px 14px; }
+}
+@media (max-width: 576px) {
+  .main { padding: 12px 12px 28px; }
+  .stats { gap: 8px; }
+  .stat { padding: 10px 12px; }
+  .stat .value { font-size: 18px; }
+  .drawer { width: 260px; }
+  .code { font-size: 20px; padding: 6px 14px; }
+}
+@media (max-width: 420px) {
+  .main { padding: 10px 10px 24px; }
+  .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat .value { font-size: 16px; }
+  .stat .label { font-size: 10px; }
+  .page-head h1 { font-size: 20px; }
+  .drawer { width: 100%; max-width: 100%; }
+  .code { font-size: 18px; padding: 4px 10px; word-break: break-all; }
+  .auth .card { width: 100%; padding: 20px 16px; }
+  .auth-logo { width: 48px; height: 48px; }
+}
+}

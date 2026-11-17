@@ -82,8 +82,8 @@ export function ImportsBrowser({ initial }: { initial: ImportRow[] }) {
         </div>
       </div>
 
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <SearchInput value={q} onSearch={(v) => { setQ(v); setPage(1); }} placeholder="Search file name" className="w-full max-w-xs" />
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <SearchInput value={q} onSearch={(v) => { setQ(v); setPage(1); }} placeholder="Search file name" className="w-full sm:max-w-xs" />
         <button
           type="button"
           onClick={refresh}

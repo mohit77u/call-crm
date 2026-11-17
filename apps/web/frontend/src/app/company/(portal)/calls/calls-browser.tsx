@@ -138,7 +138,7 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
 
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <SearchInput
-          className="w-full max-w-xs"
+          className="w-full sm:max-w-xs"
           placeholder="Search"
           value={filters.q}
           onSearch={(q) => { setFilters((f) => ({ ...f, q })); setPage(1); }}

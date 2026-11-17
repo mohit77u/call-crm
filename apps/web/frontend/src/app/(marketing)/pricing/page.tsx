@@ -8,7 +8,7 @@ export default function PricingPage() {
     <section className="section" style={{ paddingTop: 48 }}>
       <div className="section-inner">
         <h1 className="section-title" style={{ fontSize: 32 }}>Simple, transparent pricing</h1>
-        <p className="section-sub">Every plan includes the Android app, automatic call sync and agent management. Upgrade or downgrade anytime.</p>
+        <p className="section-sub">Pick call logs only, or add the agent CRM portal — every plan includes the Android app, automatic call sync and agent management. Upgrade or downgrade anytime.</p>
         <PricingClient />
       </div>
     </section>

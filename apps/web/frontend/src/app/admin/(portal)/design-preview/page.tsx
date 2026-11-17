@@ -5,9 +5,9 @@ import { TextField, EmailField, PasswordField } from "@/components/fields";
 import { PlanFields, stateFromPlan, type PlanFormState } from "../companies/plan-fields";
 
 const btnPrimary =
-  "inline-flex h-9 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60";
+  "inline-flex h-9 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 sm:w-auto";
 const btnSecondary =
-  "inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50";
+  "inline-flex h-9 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto";
 
 const sectionTitle = "text-[13px] font-semibold uppercase tracking-wider text-slate-500";
 const card = "rounded-lg border border-slate-200 bg-white shadow-sm";
@@ -27,7 +27,7 @@ function AdminPasswordField() {
 
 function Footer() {
   return (
-    <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+    <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-end">
       <button type="button" className={btnSecondary}>Cancel</button>
       <button type="button" className={btnPrimary}>Create company</button>
     </div>

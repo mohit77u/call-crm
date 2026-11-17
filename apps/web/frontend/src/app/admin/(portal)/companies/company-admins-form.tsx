@@ -85,7 +85,7 @@ export function CompanyAdminsForm({ companyId, admins }: { companyId: number; ad
 
   return (
     <form className="card form" onSubmit={onSubmit}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="mb-0!">Manage admins</h2>
         <button
           type="button"

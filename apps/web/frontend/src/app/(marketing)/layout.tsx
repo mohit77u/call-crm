@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { SiteMobileNav } from "@/components/site-mobile-nav";
 
 export default function MarketingLayout({ children }: LayoutProps<"/">) {
   return (
@@ -20,6 +21,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
             <Link href="/company/login" target="_blank" rel="noopener noreferrer" className="btn secondary">Login</Link>
             <Link href="/pricing" className="btn">Get started</Link>
           </div>
+          <SiteMobileNav />
         </div>
       </header>
       <main>{children}</main>

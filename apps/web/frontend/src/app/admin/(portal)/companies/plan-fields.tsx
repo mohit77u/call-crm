@@ -38,7 +38,7 @@ export function PlanFields({ state, setState }: { state: PlanFormState; setState
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid max-w-md grid-cols-2 gap-4">
+      <div className="grid max-w-md grid-cols-1 gap-4 sm:grid-cols-2">
         <SelectField
           name="plan"
           label="Plan"

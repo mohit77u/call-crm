@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { submitEnquiry } from "./actions";
-import { PLANS } from "@/lib/plans";
+import { plansForEdition } from "@/lib/plans";
 import { notify } from "@/lib/notify";
 import { takeNavState } from "@/lib/nav-state";
 
@@ -44,9 +44,16 @@ export function ContactForm({ selectedPlan }: { selectedPlan: string }) {
       <label>Plan
         <select name="plan" value={plan} onChange={(e) => setPlan(e.target.value)}>
           <option value="">Not sure yet</option>
-          {PLANS.map((p) => (
-            <option key={p.slug} value={p.slug}>{p.name} — up to {p.maxAgents} agents</option>
-          ))}
+          <optgroup label="Call logs only">
+            {plansForEdition("calls").map((p) => (
+              <option key={p.slug} value={p.slug}>{p.name} — up to {p.maxAgents} agents</option>
+            ))}
+          </optgroup>
+          <optgroup label="Call logs + Agent CRM">
+            {plansForEdition("crm").map((p) => (
+              <option key={p.slug} value={p.slug}>{p.name} — up to {p.maxAgents} agents</option>
+            ))}
+          </optgroup>
           <option value="custom">Custom / enterprise</option>
         </select>
       </label>

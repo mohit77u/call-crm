@@ -40,9 +40,9 @@ export function CompaniesBrowser({ companies }: { companies: CompanyRow[] }) {
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <SearchInput value={q} onSearch={setQ} placeholder="Search" className="w-full max-w-xs" />
-        <div className="flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <SearchInput value={q} onSearch={setQ} placeholder="Search" className="w-full sm:max-w-xs" />
+        <div className="flex items-center gap-2 max-sm:w-full max-sm:justify-end">
           <a className="btn secondary" href={`/api/admin/companies/export${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`}>Export CSV</a>
           <Link className="btn" href="/admin/companies/new">+ New Company</Link>
         </div>

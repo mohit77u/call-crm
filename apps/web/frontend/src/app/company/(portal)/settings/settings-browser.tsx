@@ -48,7 +48,7 @@ export function SettingsBrowser({ companyName, clientCode, adminName, adminEmail
       <div className="card">
         <h2>Company</h2>
         <form
-          className="flex items-end gap-2"
+          className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end"
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData();
@@ -65,7 +65,7 @@ export function SettingsBrowser({ companyName, clientCode, adminName, adminEmail
               className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 focus:border-[var(--primary)] focus:outline-none"
             />
           </label>
-          <button type="submit" className={primaryBtn} disabled={pending || !name.trim()}>
+          <button type="submit" className={`${primaryBtn} w-full sm:w-auto`} disabled={pending || !name.trim()}>
             {pending ? "Saving…" : "Save"}
           </button>
         </form>

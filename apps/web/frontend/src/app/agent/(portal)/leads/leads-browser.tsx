@@ -484,8 +484,8 @@ export function AgentLeadsBrowser() {
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2">
-        <SearchInput className="w-full max-w-xs" placeholder="Search" value={q} onSearch={setQ} />
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <SearchInput className="w-full sm:max-w-xs" placeholder="Search" value={q} onSearch={setQ} />
         <button
           type="button"
           onClick={() => setRequestOpen(true)}

@@ -88,7 +88,7 @@ export function CompanyCreateForm() {
         </section>
 
         <section className="border-t border-slate-100 pt-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500">Admin accounts</h3>
               <p className="mt-1 text-xs text-slate-500">These people log in to the CRM. Up to {MAX_ADMINS} admins per company.</p>
@@ -191,17 +191,17 @@ export function CompanyCreateForm() {
         </section>
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+      <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-end">
         <Link
           href="/admin/companies"
-          className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700! shadow-sm hover:bg-slate-50"
+          className="inline-flex h-9 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700! shadow-sm hover:bg-slate-50 sm:w-auto"
         >
           Cancel
         </Link>
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex h-9 items-center justify-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white shadow-sm hover:bg-[var(--primary-dark)] disabled:opacity-60"
+          className="inline-flex h-9 w-full items-center justify-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white shadow-sm hover:bg-[var(--primary-dark)] disabled:opacity-60 sm:w-auto"
         >
           {busy ? <span className="inline-flex items-center justify-center gap-2"><Spinner />Creating…</span> : "Create company"}
         </button>

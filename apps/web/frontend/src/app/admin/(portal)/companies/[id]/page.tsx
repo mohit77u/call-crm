@@ -58,9 +58,9 @@ export default async function CompanyDetailPage({ params }: PageProps<"/admin/co
       <div className="card">
         <h2>Client code</h2>
         <div className="code">{company.clientCode}</div>
-        <div style={{ marginTop: 12 }}>
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
           <RegenerateCodeButton companyId={company.id} />
-          <span className="muted" style={{ marginLeft: 8 }}>Existing logged-in phones stay connected.</span>
+          <span className="muted">Existing logged-in phones stay connected.</span>
         </div>
       </div>
 

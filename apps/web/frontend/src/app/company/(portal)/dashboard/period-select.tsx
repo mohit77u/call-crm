@@ -18,7 +18,7 @@ export function PeriodSelect({ period }: { period: string }) {
 
   return (
     <AppSelect
-      className="w-36"
+      className="w-36 max-[768px]:w-full"
       data={OPTIONS}
       value={period}
       disabled={pending}

@@ -113,7 +113,7 @@ export function NotificationBell({ listUrl, readUrl }: { listUrl: string; readUr
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 flex max-h-80 w-80 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+        <div className="absolute right-0 top-full z-50 mt-1 flex max-h-80 w-80 max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notifications</span>
             {unread > 0 && (
