@@ -70,6 +70,36 @@ export async function agentListLeads(agent: AgentContext) {
   return withNormalizedPhones(rows);
 }
 
+export async function agentExportLeadsRows(agent: AgentContext, filters: { status?: string; q?: string; accountCreated?: string; createdFrom?: string; createdTo?: string }) {
+  const where = ["l.company_id = $1", "l.assigned_agent_id = $2", "l.deleted_at IS NULL", "(l.request_status IS NULL OR l.request_status = 'approved')"];
+  const params: unknown[] = [agent.companyId, agent.agentId];
+  if (filters.status && isLeadStatus(filters.status)) {
+    params.push(filters.status);
+    where.push(`l.status = $${params.length}`);
+  }
+  if (filters.accountCreated === "yes") {
+    where.push("l.account_created");
+  } else if (filters.accountCreated === "no") {
+    where.push("NOT l.account_created");
+  }
+  if (filters.q) {
+    params.push(`%${filters.q}%`);
+    where.push(`(l.name ILIKE $${params.length} OR l.phone ILIKE $${params.length} OR l.email ILIKE $${params.length} OR l.notes ILIKE $${params.length})`);
+  }
+  pushDateFilters(where, params, filters);
+  const rows = await AppDataSource.query(
+    `SELECT l.name, l.phone, l.email, COALESCE(a.name, '') AS agent, l.status,
+            l.account_created AS "accountCreated", COALESCE(l.notes, '') AS notes,
+            l.created_at AS "createdAt", l.updated_at AS "updatedAt"
+     FROM leads l LEFT JOIN agents a ON a.id = l.assigned_agent_id
+     WHERE ${where.join(" AND ")}
+     ORDER BY l.created_at DESC, l.id DESC
+     LIMIT 10000`,
+    params,
+  );
+  return withNormalizedPhones(rows);
+}
+
 // Agent lead request is just a notification to company admins — the admin
 // decides how many leads to assign and to whom.
 export async function agentRequestLeads(agent: AgentContext) {
@@ -110,6 +140,7 @@ export async function agentUpdateLead(agent: AgentContext, id: number, patch: Re
   }
   if ("phone" in patch) {
     const phone = normalizePhone(patch.phone);
+    if (!phone) throw badRequest("Enter a valid phone number");
     await assertPhoneAvailable(agent.companyId, phone, id);
     push("phone", phone);
   }
@@ -520,13 +551,13 @@ export async function adminImportLeads(
         const row = raw[i];
         if (!Array.isArray(row)) continue;
         const phone = normalizePhone(cell(row, m.phone, 50));
-        const rawName = nameIdx >= 0 ? cell(row, nameIdx, 200) : null;
-        const name = (rawName ? toTitleCase(rawName) : null) || phone;
-        if (!name) {
+        if (!phone) {
           skipped++;
-          failures.push({ cells: row, reason: "Missing name & phone" });
+          failures.push({ cells: row, reason: "Invalid phone number (expected 10 digits)" });
           continue;
         }
+        const rawName = nameIdx >= 0 ? cell(row, nameIdx, 200) : null;
+        const name = (rawName ? toTitleCase(rawName) : null) || phone;
         const emailRaw = cell(row, m.email, 200);
         const email = emailRaw ? emailRaw.toLowerCase() : null;
         const notes = cell(row, m.notes);

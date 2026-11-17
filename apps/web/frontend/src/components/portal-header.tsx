@@ -192,6 +192,13 @@ export function PortalHeader({
     document.body.classList.remove("nav-open");
   }, [pathname]);
 
+  // Restore desktop sidebar collapse preference.
+  useEffect(() => {
+    if (window.localStorage.getItem("crm-sidebar-collapsed") === "1") {
+      document.body.classList.add("sidebar-collapsed");
+    }
+  }, []);
+
   useEffect(() => {
     if (!menuOpen) return;
     function onClick(e: MouseEvent) {
@@ -211,13 +218,26 @@ export function PortalHeader({
   const subtitle = showPhone ? (phone ?? email ?? null) : (email ?? null);
 
   return (
+    <>
+    <div
+      className="nav-backdrop"
+      aria-hidden
+      onClick={() => document.body.classList.remove("nav-open")}
+    />
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
           aria-label="Menu"
-          onClick={() => document.body.classList.toggle("nav-open")}
-          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md bg-transparent p-0! text-slate-600 shadow-none hover:bg-slate-100 max-[900px]:inline-flex"
+          onClick={() => {
+            if (window.matchMedia("(max-width: 900px)").matches) {
+              document.body.classList.toggle("nav-open");
+            } else {
+              const collapsed = document.body.classList.toggle("sidebar-collapsed");
+              window.localStorage.setItem("crm-sidebar-collapsed", collapsed ? "1" : "0");
+            }
+          }}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-transparent p-0! text-slate-600 shadow-none hover:bg-slate-100"
         >
           <Menu size={20} />
         </button>
@@ -292,5 +312,6 @@ export function PortalHeader({
       />
       <PasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} passwordUrl={passwordUrl} />
     </header>
+    </>
   );
 }

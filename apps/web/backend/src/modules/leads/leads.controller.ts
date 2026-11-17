@@ -80,6 +80,30 @@ agentLeadsRouter.get(
   }),
 );
 
+agentLeadsRouter.get(
+  "/export.csv",
+  asyncHandler(async (req, res) => {
+    const rows = await leadsService.agentExportLeadsRows(req.agent!, {
+      status: q(req.query.status),
+      q: q(req.query.q),
+      accountCreated: q(req.query.accountCreated),
+      createdFrom: q(req.query.createdFrom),
+      createdTo: q(req.query.createdTo),
+    });
+    const fmt = (v: unknown) => (v ? new Date(String(v)).toLocaleString("en-IN", { timeZone: TIME_ZONE }) : "");
+    sendCsv(
+      res,
+      `my-leads-${new Date().toISOString().slice(0, 10)}.csv`,
+      "Name,Phone,Email,Agent,Status,Account created,Notes,Created,Updated",
+      rows.map((r: Record<string, unknown>) =>
+        [r.name, r.phone, r.email, r.agent, r.status, r.accountCreated ? "Yes" : "No", r.notes, fmt(r.createdAt), fmt(r.updatedAt)]
+          .map(csvCell)
+          .join(","),
+      ),
+    );
+  }),
+);
+
 agentLeadsRouter.post(
   "/requests",
   asyncHandler(async (req, res) => {
@@ -258,13 +282,17 @@ crmLeadsRouter.get(
   asyncHandler(async (req, res) => {
     const data = await leadsService.getLeadImportErrors(req.admin!, Number(req.params.id));
     if (!data) throw notFound("Import not found");
+    // Drop system-export date columns (Created/Updated) — they are artifacts of
+    // re-uploading an exported file, not user data worth showing in errors.
+    const DROP_COL = /^(created|updated)( date| at| on)?$/i;
+    const keep = data.headers.map((h, i) => ({ h, i })).filter(({ h }) => !DROP_COL.test(h.trim()));
     sendCsv(
       res,
       `import-${req.params.id}-errors.csv`,
-      [...data.headers, "Error"].map(csvCell).join(","),
+      [...keep.map(({ h }) => h), "Error"].map(csvCell).join(","),
       data.errors.map((e) =>
         // Pad/truncate cells to the header width so every CSV row is aligned.
-        [...data.headers.map((_, i) => csvCell(e.cells[i])), csvCell(e.reason)].join(","),
+        [...keep.map(({ i }) => csvCell(e.cells[i])), csvCell(e.reason)].join(","),
       ),
     );
   }),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Pencil, X } from "lucide-react";
+import { Download, Pencil, SlidersHorizontal, X } from "lucide-react";
 import { Tooltip } from "@mantine/core";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -312,11 +312,22 @@ function NotesModal({ lead, onClose, onSave }: { lead: LeadRow | null; onClose: 
   );
 }
 
+const ALL = "__all__";
+
 export function AgentLeadsBrowser() {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [accountCreated, setAccountCreated] = useState("");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftStatus, setDraftStatus] = useState("");
+  const [draftAccountCreated, setDraftAccountCreated] = useState("");
+  const [draftFrom, setDraftFrom] = useState("");
+  const [draftTo, setDraftTo] = useState("");
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestPending, startRequestTransition] = useTransition();
   const [editLead, setEditLead] = useState<LeadRow | null>(null);
@@ -349,13 +360,24 @@ export function AgentLeadsBrowser() {
     return () => window.removeEventListener("crm:data-refresh", handler);
   }, [load]);
 
-  const filtered = leads.filter(
-    (l) =>
-      !q ||
-      l.name.toLowerCase().includes(q.toLowerCase()) ||
-      (l.phone ?? "").includes(q) ||
-      (l.email ?? "").toLowerCase().includes(q.toLowerCase()),
-  );
+  const filtered = leads.filter((l) => {
+    if (q) {
+      const needle = q.toLowerCase();
+      if (
+        !l.name.toLowerCase().includes(needle) &&
+        !(l.phone ?? "").includes(q) &&
+        !(l.email ?? "").toLowerCase().includes(needle)
+      )
+        return false;
+    }
+    if (statusFilter && l.status !== statusFilter) return false;
+    if (accountCreated === "yes" && !l.accountCreated) return false;
+    if (accountCreated === "no" && l.accountCreated) return false;
+    const day = (l.createdAt ?? "").slice(0, 10);
+    if (createdFrom && day < createdFrom) return false;
+    if (createdTo && day > createdTo) return false;
+    return true;
+  });
 
   const FIELD_LABELS: Record<string, string> = {
     name: "Name",
@@ -475,6 +497,43 @@ export function AgentLeadsBrowser() {
     },
   ];
 
+  const appliedCount = [statusFilter, accountCreated, createdFrom, createdTo].filter(Boolean).length;
+
+  const openFilter = () => {
+    setDraftStatus(statusFilter);
+    setDraftAccountCreated(accountCreated);
+    setDraftFrom(createdFrom);
+    setDraftTo(createdTo);
+    setFilterOpen(true);
+  };
+
+  const applyFilters = () => {
+    setStatusFilter(draftStatus);
+    setAccountCreated(draftAccountCreated);
+    setCreatedFrom(draftFrom);
+    setCreatedTo(draftTo);
+    setFilterOpen(false);
+  };
+
+  const clearFilters = () => {
+    setDraftStatus("");
+    setDraftAccountCreated("");
+    setDraftFrom("");
+    setDraftTo("");
+    setStatusFilter("");
+    setAccountCreated("");
+    setCreatedFrom("");
+    setCreatedTo("");
+    setFilterOpen(false);
+  };
+
+  const exportQs = new URLSearchParams();
+  if (q) exportQs.set("q", q);
+  if (statusFilter) exportQs.set("status", statusFilter);
+  if (accountCreated) exportQs.set("accountCreated", accountCreated);
+  if (createdFrom) exportQs.set("createdFrom", createdFrom);
+  if (createdTo) exportQs.set("createdTo", createdTo);
+
   return (
     <>
       <div className="page-head">
@@ -488,11 +547,39 @@ export function AgentLeadsBrowser() {
         <SearchInput className="w-full sm:max-w-xs" placeholder="Search" value={q} onSearch={setQ} />
         <button
           type="button"
-          onClick={() => setRequestOpen(true)}
-          className="ml-auto inline-flex h-9 items-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white hover:bg-[var(--primary-dark)]"
+          onClick={openFilter}
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
         >
-          + Request leads
+          <SlidersHorizontal size={14} /> Filters
+          {appliedCount > 0 && (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-semibold text-white">
+              {appliedCount}
+            </span>
+          )}
         </button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <a
+            className={`inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium transition-colors ${
+              filtered.length === 0 ? "cursor-not-allowed text-slate-400" : "text-slate-700 hover:bg-slate-50"
+            }`}
+            href={`/api/agent/leads/export.csv?${exportQs}`}
+            onClick={(e) => {
+              if (filtered.length === 0) {
+                e.preventDefault();
+                notify.error("No records to export");
+              }
+            }}
+          >
+            <Download size={14} /> Export CSV
+          </a>
+          <button
+            type="button"
+            onClick={() => setRequestOpen(true)}
+            className="inline-flex h-9 items-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white hover:bg-[var(--primary-dark)]"
+          >
+            + Request leads
+          </button>
+        </div>
       </div>
 
       {error && <div className="error" style={{ marginBottom: 12 }}>{error}</div>}
@@ -521,6 +608,61 @@ export function AgentLeadsBrowser() {
         onClose={() => setNotesFor(null)}
         onSave={(notes) => (notesFor ? saveField(notesFor, { notes: notes || null }) : Promise.resolve({}))}
       />
+
+      {filterOpen && (
+        <>
+          <div className="drawer-backdrop" onClick={() => setFilterOpen(false)} />
+          <aside className="drawer">
+            <div className="drawer-head">
+              <h2>Filters</h2>
+              <button type="button" className="drawer-close" onClick={() => setFilterOpen(false)}>✕</button>
+            </div>
+            <div className="drawer-body">
+              <label className="drawer-field">
+                <span>Status</span>
+                <AppSelect
+                  value={draftStatus || ALL}
+                  onChange={(v) => setDraftStatus(v === ALL ? "" : v ?? "")}
+                  data={[{ value: ALL, label: "All statuses" }, ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }))]}
+                />
+              </label>
+              <label className="drawer-field">
+                <span>Account created</span>
+                <AppSelect
+                  value={draftAccountCreated || ALL}
+                  onChange={(v) => setDraftAccountCreated(v === ALL ? "" : v ?? "")}
+                  data={[
+                    { value: ALL, label: "All" },
+                    { value: "yes", label: "Yes" },
+                    { value: "no", label: "No" },
+                  ]}
+                />
+              </label>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Created date</p>
+              <label className="drawer-field">
+                <span>From</span>
+                <input
+                  type="date"
+                  value={draftFrom}
+                  onChange={(e) => setDraftFrom(e.target.value)}
+                />
+              </label>
+              <label className="drawer-field">
+                <span>To</span>
+                <input
+                  type="date"
+                  value={draftTo}
+                  onChange={(e) => setDraftTo(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="drawer-foot">
+              <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={clearFilters}>Clear</button>
+              <button type="button" className="btn" style={{ flex: 1 }} onClick={applyFilters}>Apply</button>
+            </div>
+          </aside>
+        </>
+      )}
     </>
   );
 }

@@ -23,6 +23,17 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   appUrl: (process.env.APP_URL ?? "http://localhost:3050").replace(/\/$/, ""),
+  // Public URL of this API as seen from the internet — used for startup logs.
+  // Set PUBLIC_URL explicitly, or it is derived from platform env vars.
+  publicUrl: (() => {
+    const explicit = process.env.PUBLIC_URL?.trim().replace(/\/+$/, "");
+    if (explicit) return explicit;
+    const railway = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+    if (railway) return `https://${railway}`;
+    const render = process.env.RENDER_EXTERNAL_URL?.trim().replace(/\/+$/, "");
+    if (render) return render;
+    return "";
+  })(),
   timeZone: process.env.CRM_TIME_ZONE ?? "Asia/Kolkata",
   superadminEmails: (process.env.SUPERADMIN_EMAILS ?? process.env.SUPERADMIN_EMAIL ?? "")
     .split(",")

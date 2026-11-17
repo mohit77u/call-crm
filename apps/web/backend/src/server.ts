@@ -12,7 +12,9 @@ async function main() {
 
   const app = createApp();
   app.listen(config.port, () => {
-    console.log(`Call CRM API listening on http://localhost:${config.port}`);
+    const publicUrl = config.publicUrl || `http://localhost:${config.port}`;
+    console.log(`Call CRM API listening on ${publicUrl}`);
+    if (config.publicUrl) console.log(`(local bind: http://localhost:${config.port})`);
   });
 }
 

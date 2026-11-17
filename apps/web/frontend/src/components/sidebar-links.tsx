@@ -2,8 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  Building2,
+  Contact,
+  FolderOpen,
+  Gift,
+  LayoutDashboard,
+  Phone,
+  Plus,
+  Settings,
+  UserPlus,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
-type NavLink = { href: string; label: string; exact?: boolean };
+const ICONS = {
+  dashboard: LayoutDashboard,
+  companies: Building2,
+  agents: Users,
+  calls: Phone,
+  newCompany: UserPlus,
+  leads: Contact,
+  trials: Gift,
+  files: FolderOpen,
+  settings: Settings,
+  plus: Plus,
+} satisfies Record<string, LucideIcon>;
+
+export type SidebarIcon = keyof typeof ICONS;
+
+export type NavLink = { href: string; label: string; exact?: boolean; icon?: SidebarIcon };
 
 export function SidebarLinks({ links }: { links: NavLink[] }) {
   const pathname = usePathname();
@@ -16,14 +44,17 @@ export function SidebarLinks({ links }: { links: NavLink[] }) {
     <>
       {matches.map(({ link, match }) => {
         const active = match && link.href.length === bestLength;
+        const Icon = link.icon ? ICONS[link.icon] : null;
         return (
           <Link
             key={link.href}
             href={link.href}
             onClick={() => document.body.classList.remove("nav-open")}
-            className={`capitalize ${active ? "active" : ""}`}
+            className={`sidebar-link capitalize ${active ? "active" : ""}`}
           >
-            {link.label}
+            {Icon && <Icon size={17} className="sidebar-link-icon" />}
+            <span className="nav-label">{link.label}</span>
+            <span className="nav-tip" role="tooltip">{link.label}</span>
           </Link>
         );
       })}

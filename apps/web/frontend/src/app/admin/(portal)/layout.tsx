@@ -1,15 +1,15 @@
 import Image from "next/image";
 import { requireSuperadmin } from "@/lib/auth";
-import { SidebarLinks } from "@/components/sidebar-links";
+import { SidebarLinks, type NavLink } from "@/components/sidebar-links";
 import { PortalHeader } from "@/components/portal-header";
 import { platformLogout } from "../actions";
 
-const ADMIN_LINKS = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/companies", label: "Companies" },
-  { href: "/admin/agents", label: "Agents" },
-  { href: "/admin/calls", label: "Call logs" },
-  { href: "/admin/companies/new", label: "+ New company" },
+const ADMIN_LINKS: NavLink[] = [
+  { href: "/admin/dashboard", label: "Dashboard", icon: "dashboard" },
+  { href: "/admin/companies", label: "Companies", icon: "companies" },
+  { href: "/admin/agents", label: "Agents", icon: "agents" },
+  { href: "/admin/calls", label: "Call logs", icon: "calls" },
+  { href: "/admin/companies/new", label: "+ New company", icon: "newCompany" },
 ];
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
@@ -17,7 +17,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <div className="shell">
       <nav className="sidebar">
-        <div className="brand"><Image src="/logo.png" className="brand-logo" width={30} height={30} alt="" />Call CRM</div>
+        <div className="brand"><Image src="/logo.png" className="brand-logo" width={30} height={30} alt="" /><span>Call CRM</span></div>
         <div className="h-4" aria-hidden />
         <SidebarLinks links={ADMIN_LINKS} />
       </nav>

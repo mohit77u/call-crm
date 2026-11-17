@@ -1,28 +1,28 @@
 import Image from "next/image";
 import { requireAdmin, hasFeature } from "@/lib/auth";
-import { SidebarLinks } from "@/components/sidebar-links";
+import { SidebarLinks, type NavLink } from "@/components/sidebar-links";
 import { PortalHeader } from "@/components/portal-header";
 import { logout } from "../actions";
 
 export default async function CrmLayout({ children }: LayoutProps<"/">) {
   const admin = await requireAdmin();
-  const links = [
-    ...(hasFeature(admin, "reports") ? [{ href: "/company/dashboard", label: "Dashboard" }] : []),
-    { href: "/company/calls", label: "Call logs" },
+  const links: NavLink[] = [
+    ...(hasFeature(admin, "reports") ? ([{ href: "/company/dashboard", label: "Dashboard", icon: "dashboard" }] as NavLink[]) : []),
+    { href: "/company/calls", label: "Call logs", icon: "calls" },
     ...(hasFeature(admin, "leadManagement")
-      ? [
-          { href: "/company/leads", label: "Leads" },
-          { href: "/company/trials", label: "Free trial" },
-          { href: "/company/imported-files", label: "Imported files" },
-        ]
+      ? ([
+          { href: "/company/leads", label: "Leads", icon: "leads" },
+          { href: "/company/trials", label: "Free trial", icon: "trials" },
+          { href: "/company/imported-files", label: "Imported files", icon: "files" },
+        ] as NavLink[])
       : []),
-    { href: "/company/agents", label: "Agents" },
-    { href: "/company/settings", label: "Settings" },
+    { href: "/company/agents", label: "Agents", icon: "agents" },
+    { href: "/company/settings", label: "Settings", icon: "settings" },
   ];
   return (
     <div className="shell">
       <nav className="sidebar">
-        <div className="brand"><Image src="/logo.png" className="brand-logo" width={30} height={30} alt="" />Call CRM</div>
+        <div className="brand"><Image src="/logo.png" className="brand-logo" width={30} height={30} alt="" /><span>Call CRM</span></div>
         <div className="h-4" aria-hidden />
         <SidebarLinks links={links} />
       </nav>
