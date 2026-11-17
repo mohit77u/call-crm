@@ -50,24 +50,26 @@ export function HomeShowcase() {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex border-b border-slate-200">
-        {(Object.keys(PANELS) as Tab[]).map((key) => {
-          const P = PANELS[key];
-          const active = tab === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`flex flex-1 items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold transition-colors ${
-                active ? "bg-white text-[var(--primary)] shadow-[inset_0_-2px_0_var(--primary)]" : "bg-slate-50 text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <P.icon size={16} />
-              {key === "calls" ? "Call logs" : "Agent CRM"}
-            </button>
-          );
-        })}
+      <div className="flex justify-center border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="inline-flex w-full max-w-md rounded-xl border border-slate-200 bg-slate-100 p-1 sm:w-auto">
+          {(Object.keys(PANELS) as Tab[]).map((key) => {
+            const P = PANELS[key];
+            const active = tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTab(key)}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
+                  active ? "bg-white text-[var(--primary)] shadow-sm" : "bg-transparent text-slate-500 hover:bg-slate-200/60 hover:text-slate-700"
+                }`}
+              >
+                <P.icon size={15} />
+                {key === "calls" ? "Call logs" : "Agent CRM"}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="grid gap-8 p-6 sm:grid-cols-[1.2fr_1fr] sm:p-8">
         <div>

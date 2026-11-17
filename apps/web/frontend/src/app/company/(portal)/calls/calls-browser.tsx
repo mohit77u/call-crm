@@ -155,7 +155,7 @@ export function CallsBrowser({ canExport }: { canExport: boolean }) {
             </span>
           )}
         </button>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {canExport && <a className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50" href={`/api/calls/export?${exportQs}`}>Export CSV</a>}
         </div>
       </div>

@@ -33,7 +33,7 @@ export function CallsBarChart({ data }: { data: { day: string; total: number }[]
           formatter={(v) => [`${v} calls`, "Calls"]}
           labelFormatter={(l) => `Date: ${l}`}
         />
-        <Bar dataKey="total" fill="#4f46e5" radius={[6, 6, 0, 0]} maxBarSize={30} />
+        <Bar dataKey="total" fill="#228be6" radius={[6, 6, 0, 0]} maxBarSize={30} />
       </BarChart>
     </ResponsiveContainer>
   );

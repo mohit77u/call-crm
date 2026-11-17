@@ -46,22 +46,26 @@ export function SiteMobileNav() {
         aria-label="Menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-transparent p-0! text-slate-600 shadow-none hover:bg-slate-100"
       >
         {open ? <X size={20} /> : <Menu size={20} />}
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
-          {LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              onClick={() => setOpen(false)}
-              className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              {l.label}
-            </Link>
-          ))}
+          {LINKS.map((l) => {
+            const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setOpen(false)}
+                aria-current={active ? "page" : undefined}
+                className={`block px-4 py-2.5 text-sm font-medium ${active ? "bg-[var(--primary)]/5 text-[var(--primary)]" : "text-slate-700 hover:bg-slate-50"}`}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

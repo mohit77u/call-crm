@@ -217,7 +217,7 @@ export function PortalHeader({
           type="button"
           aria-label="Menu"
           onClick={() => document.body.classList.toggle("nav-open")}
-          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 max-[900px]:inline-flex"
+          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md bg-transparent p-0! text-slate-600 shadow-none hover:bg-slate-100 max-[900px]:inline-flex"
         >
           <Menu size={20} />
         </button>

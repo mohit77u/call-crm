@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { SiteMobileNav } from "@/components/site-mobile-nav";
+import { SiteNavLinks } from "@/components/site-nav-links";
 
 export default function MarketingLayout({ children }: LayoutProps<"/">) {
   return (
@@ -12,10 +13,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
             <span>Call CRM</span>
           </Link>
           <nav className="site-links">
-            <Link href="/">Home</Link>
-            <Link href="/pricing">Pricing</Link>
-            <Link href="/about">About</Link>
-            <Link href="/contact">Contact</Link>
+            <SiteNavLinks />
           </nav>
           <div className="site-actions">
             <Link href="/company/login" target="_blank" rel="noopener noreferrer" className="btn secondary">Login</Link>
@@ -50,6 +48,7 @@ export default function MarketingLayout({ children }: LayoutProps<"/">) {
           <div className="footer-col">
             <b>Account</b>
             <Link href="/company/login" target="_blank" rel="noopener noreferrer">Company login</Link>
+            <Link href="/agent/login" target="_blank" rel="noopener noreferrer">Agent login</Link>
           </div>
         </div>
         <div className="footer-bottom">

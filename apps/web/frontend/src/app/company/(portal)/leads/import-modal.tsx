@@ -177,7 +177,7 @@ export function ImportLeadsModal({ agents, onClose, onDone }: { agents: AgentOpt
                 onDrop={onDrop}
                 onClick={() => fileRef.current?.click()}
                 className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors ${
-                  dragOver ? "border-[var(--primary)] bg-indigo-50" : "border-slate-300 bg-slate-50 hover:bg-slate-100"
+                  dragOver ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-slate-300 bg-slate-50 hover:bg-slate-100"
                 }`}
               >
                 <FileSpreadsheet size={40} className="text-slate-400" />

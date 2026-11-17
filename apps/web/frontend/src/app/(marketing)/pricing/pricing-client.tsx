@@ -9,7 +9,7 @@ import { FEATURE_DEFS, LIMIT_DEFS, type FeatureKey, type LimitKey } from "@/lib/
 import { setNavState } from "@/lib/nav-state";
 
 function CheckIcon({ ok }: { ok: boolean }) {
-  return ok ? <Check size={15} className="inline text-emerald-600" strokeWidth={3} /> : <span className="text-slate-300">—</span>;
+  return ok ? <Check size={15} className="inline text-emerald-500" strokeWidth={3} /> : <span className="text-slate-300">—</span>;
 }
 
 function PlanCard({ plan, yearly }: { plan: PlanDef; yearly: boolean }) {
@@ -17,31 +17,38 @@ function PlanCard({ plan, yearly }: { plan: PlanDef; yearly: boolean }) {
   const featured = plan.tier === "pro";
   const price = yearly ? plan.priceYearly : plan.priceMonthly;
   const perMonth = yearly ? Math.round(plan.priceYearly / 12) : plan.priceMonthly;
+  const tierName = plan.name.replace(" + CRM", "");
+
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm transition-shadow hover:shadow-lg sm:p-7 ${
-        featured ? "border-[var(--primary)] shadow-[0_12px_32px_rgba(79,70,229,0.15)]" : "border-slate-200"
+      className={`relative flex flex-col rounded-2xl p-6 pt-9 transition-all duration-200 sm:p-7 sm:pt-10 ${
+        featured
+          ? "bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-[0_20px_45px_rgba(15,23,42,0.35)]"
+          : "border border-slate-200 bg-white text-slate-900 shadow-sm hover:-translate-y-1 hover:shadow-lg"
       }`}
     >
       {featured && (
-        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-[var(--primary)] px-3.5 py-1 text-[11.5px] font-bold text-white shadow">
+        <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-amber-400 px-3.5 py-1 text-[11.5px] font-bold text-slate-900 shadow">
           <Sparkles size={11} /> Most popular
         </div>
       )}
-      <div className="text-sm font-semibold text-slate-500">{plan.name.replace(" + CRM", "")}</div>
-      <div className="mt-1 text-xs text-slate-400">{plan.tagline}</div>
-      <div className="mt-4 flex items-end gap-1.5">
-        <span className="text-4xl font-extrabold tracking-tight text-slate-900 max-[480px]:text-3xl">{inr(price)}</span>
-        <span className="pb-1 text-sm text-slate-400">/{yearly ? "year" : "month"}</span>
+      <div className={`text-sm font-semibold ${featured ? "text-slate-300" : "text-slate-500"}`}>
+        {tierName}
+        {plan.edition === "crm" && <span className={featured ? "text-sky-300" : "text-[var(--primary)]"}> + Agent CRM</span>}
       </div>
-      {yearly && <div className="mt-1 text-xs text-slate-400">{inr(perMonth)}/mo billed annually · 2 months free</div>}
-      <div className="mt-3 text-sm text-slate-500">
-        <b className="text-slate-800">{plan.maxAgents}</b> agents included
+      <div className={`mt-1 text-xs ${featured ? "text-slate-400" : "text-slate-400"}`}>{plan.tagline}</div>
+      <div className="mt-4 flex items-end gap-1.5">
+        <span className="text-4xl font-extrabold tracking-tight max-[480px]:text-3xl">{inr(price)}</span>
+        <span className={`pb-1 text-sm ${featured ? "text-slate-400" : "text-slate-400"}`}>/{yearly ? "year" : "month"}</span>
+      </div>
+      {yearly && <div className={`mt-1 text-xs ${featured ? "text-slate-400" : "text-slate-400"}`}>{inr(perMonth)}/mo billed annually · 2 months free</div>}
+      <div className={`mt-3 text-sm ${featured ? "text-slate-300" : "text-slate-500"}`}>
+        <b className={featured ? "text-white" : "text-slate-800"}>{plan.maxAgents}</b> agents included
       </div>
       <ul className="mt-5 flex flex-1 flex-col gap-2.5">
         {plan.highlights.map((h) => (
-          <li key={h} className="flex items-start gap-2 text-[13.5px] text-slate-600">
-            <Check size={15} className="mt-0.5 shrink-0 text-emerald-600" strokeWidth={3} />
+          <li key={h} className={`flex items-start gap-2 text-[13.5px] ${featured ? "text-slate-300" : "text-slate-600"}`}>
+            <Check size={15} className={`mt-0.5 shrink-0 ${featured ? "text-emerald-400" : "text-emerald-600"}`} strokeWidth={3} />
             {h}
           </li>
         ))}
@@ -49,7 +56,7 @@ function PlanCard({ plan, yearly }: { plan: PlanDef; yearly: boolean }) {
       <a
         className={`mt-6 inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-colors ${
           featured
-            ? "bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)]"
+            ? "bg-white text-slate-900 hover:bg-slate-100"
             : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
         }`}
         href="/contact"
@@ -82,7 +89,7 @@ function Toggle<T extends string>({
           type="button"
           onClick={() => onChange(o.value)}
           className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
-            value === o.value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            value === o.value ? "bg-white text-slate-900 shadow-sm" : "bg-transparent text-slate-500 hover:bg-slate-200/60 hover:text-slate-700"
           }`}
         >
           {o.icon}
@@ -115,11 +122,15 @@ export default function PricingClient() {
         onChange={(v) => setYearly(v === "yearly")}
         options={[
           { value: "monthly", label: "Monthly" },
-          { value: "yearly", label: "Yearly", icon: <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">save ~17%</span> },
+          {
+            value: "yearly",
+            label: "Yearly",
+            icon: <span className="rounded-full bg-emerald-400 px-2.5 py-0.5 text-[11px] font-bold text-slate-900 shadow-sm">save ~17%</span>,
+          },
         ]}
       />
 
-      <div className="grid w-full grid-cols-1 gap-5 pt-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid w-full grid-cols-1 items-stretch gap-5 pt-3 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((p) => <PlanCard key={p.slug} plan={p} yearly={yearly} />)}
       </div>
       <p className="text-center text-sm text-slate-500">

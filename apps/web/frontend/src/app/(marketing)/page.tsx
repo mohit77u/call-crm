@@ -109,11 +109,11 @@ export default function HomePage() {
               and with the Agent CRM edition, your team gets a full lead-management portal of
               their own. No manual entry, no guesswork.
             </p>
-            <div className="hero-cta max-[576px]:flex-col max-[576px]:items-stretch">
-              <Link href="/pricing" className="btn btn-lg max-[576px]:text-center">View pricing</Link>
-              <Link href="/company/login" target="_blank" rel="noopener noreferrer" className="btn btn-lg secondary-ghost max-[576px]:text-center">Customer login</Link>
+            <div className="hero-cta w-full max-w-[760px] flex-wrap justify-start">
+              <Link href="/pricing" className="btn btn-lg whitespace-nowrap">View pricing</Link>
+              <Link href="/company/login" target="_blank" rel="noopener noreferrer" className="btn btn-lg secondary-ghost whitespace-nowrap">Customer login</Link>
             </div>
-            <div className="hero-points max-[576px]:flex-col max-[576px]:items-start max-[576px]:gap-2">
+            <div className="hero-points">
               <span>✓ Automatic background sync</span>
               <span>✓ Agent CRM portal included</span>
               <span>✓ Plans from ₹1,999/month</span>
@@ -162,12 +162,14 @@ export default function HomePage() {
         <div className="section-inner">
           <h2 className="section-title">Everything you need to run calls &amp; leads</h2>
           <p className="section-sub">Built for sales and support teams that live on the phone</p>
-          <div className="features-grid">
+          <div className="mx-auto grid max-w-4xl grid-cols-1 gap-x-10 gap-y-2 sm:grid-cols-2">
             {features.map((f) => (
-              <div className="feature-card" key={f.title}>
-                <div className="f-ico"><f.icon /></div>
-                <h3>{f.title}</h3>
-                <p className="muted">{f.desc}</p>
+              <div key={f.title} className="flex items-start gap-3.5 rounded-xl px-4 py-3.5 transition-colors hover:bg-slate-50">
+                <div className="f-ico shrink-0" style={{ width: 38, height: 38, marginBottom: 0, borderRadius: 10 }}><f.icon /></div>
+                <div>
+                  <h3 className="text-[15px] font-semibold text-slate-900">{f.title}</h3>
+                  <p className="mt-1 text-[13px] leading-relaxed text-slate-500">{f.desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -188,12 +190,15 @@ export default function HomePage() {
                 <Link href="/pricing" className="btn secondary" style={{ marginTop: 14 }}>Learn more</Link>
               </div>
             ))}
-            <div className="plan-card" style={{ borderStyle: "dashed", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-              <div className="plan-name">+ Agent CRM</div>
-              <div className="muted" style={{ fontSize: 13, margin: "8px 0 12px" }}>Same tiers, agent portal &amp; lead management included</div>
-              <div className="plan-price" style={{ fontSize: 26 }}>{inr(crmPlans[0].priceMonthly)}<span>/mo onwards</span></div>
-              <Link href="/pricing" className="btn" style={{ marginTop: 14 }}>Compare editions</Link>
+          </div>
+          <div className="plan-card mx-auto mt-5 flex max-w-md flex-col items-center border-[var(--primary)]/40 text-center" style={{ borderStyle: "solid" }}>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--primary)]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[var(--primary)]">
+              Agent CRM edition
             </div>
+            <div className="plan-name mt-3">Call logs + Agent CRM</div>
+            <div className="muted" style={{ fontSize: 13, margin: "8px 0 12px" }}>Same tiers — agent portal, lead requests &amp; lead import included</div>
+            <div className="plan-price" style={{ fontSize: 26 }}>{inr(crmPlans[0].priceMonthly)}<span>/mo onwards</span></div>
+            <Link href="/pricing" className="btn" style={{ marginTop: 14 }}>Compare editions</Link>
           </div>
           <p style={{ textAlign: "center", marginTop: 18 }}>
             <Link href="/pricing">See plans &amp; pricing →</Link>
