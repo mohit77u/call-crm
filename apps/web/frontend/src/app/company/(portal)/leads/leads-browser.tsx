@@ -601,8 +601,9 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
               <div className="absolute right-0 top-full z-40 mt-1 w-52 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                 <button
                   type="button"
+                  disabled={!data || data.total === 0}
                   onClick={() => { setBulkOpen(false); setAssignOpen(true); }}
-                  className="flex w-full items-center gap-2 bg-transparent px-3 py-1.5 text-left text-[13px] text-slate-600 shadow-none hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 bg-transparent px-3 py-1.5 text-left text-[13px] text-slate-600 shadow-none hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <UserPlus size={14} className="text-slate-400" />
                   {selectedPageIds.length > 0 ? `Assign selected (${selectedPageIds.length})` : "Assign to agent"}
