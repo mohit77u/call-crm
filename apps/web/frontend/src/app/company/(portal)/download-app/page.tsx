@@ -7,7 +7,7 @@ export default async function DownloadAppPage() {
   await requireAdmin();
   return (
     <>
-      <div className="page-head">
+      <div className="page-head" style={{ marginBottom: 6 }}>
         <div>
           <h1>Download app</h1>
           <p className="page-sub">Get the Call CRM Android app on your device</p>

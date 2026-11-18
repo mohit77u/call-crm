@@ -18,7 +18,6 @@ type DataTableProps<T> = {
 };
 
 export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = false, emptyMessage = "No records.", minHeight = 420, footer }: DataTableProps<T>) {
-  const colCount = columns.length;
   return (
     <div className="mb-1.5 w-full min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       {loading ? (
@@ -27,6 +26,10 @@ export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = fa
             <span className="inline-block h-8 w-8 animate-spin rounded-full border-[3px] border-slate-300 border-t-[var(--primary)]" />
             Loading…
           </span>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex items-center justify-center px-4 py-16 text-center">
+          <span className="text-sm text-slate-500">{emptyMessage}</span>
         </div>
       ) : (
       <table className="w-full min-w-max border-collapse">
@@ -40,23 +43,15 @@ export function DataTable<T>({ columns, rows, rowKey, rowClassName, loading = fa
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={colCount} className="px-3 py-16 text-center text-sm text-slate-500">
-                {emptyMessage}
-              </td>
+          {rows.map((row) => (
+            <tr key={rowKey(row)} className={rowClassName?.(row)}>
+              {columns.map((c, i) => (
+                <td key={i} className={c.className}>
+                  {c.cell(row)}
+                </td>
+              ))}
             </tr>
-          ) : (
-            rows.map((row) => (
-              <tr key={rowKey(row)} className={rowClassName?.(row)}>
-                {columns.map((c, i) => (
-                  <td key={i} className={c.className}>
-                    {c.cell(row)}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
+          ))}
         </tbody>
       </table>
       )}

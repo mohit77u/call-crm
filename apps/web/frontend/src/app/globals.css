@@ -35,7 +35,7 @@ body {
 a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: none; }
 h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 18px; }
-h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; color: var(--text); }
+h2 { font-size: 15px; font-weight: 600; margin: 0 0 5px; color: var(--text); }
 
 /* ---------- Layout ---------- */
 .shell { display: flex; min-height: 100vh; }
