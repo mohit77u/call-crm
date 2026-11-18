@@ -36,7 +36,7 @@ export function DownloadAppClient() {
   }
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="max-w-2xl">
       <div className="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
         <Image src="/logo.png" alt="Call CRM" width={64} height={64} className="mx-auto rounded-2xl" />
         <h2 className="mt-3 text-lg font-semibold text-slate-900">Call CRM for Android</h2>
