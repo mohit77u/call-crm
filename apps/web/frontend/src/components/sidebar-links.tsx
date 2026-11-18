@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   Contact,
+  Download,
   FolderOpen,
   Gift,
   LayoutDashboard,
@@ -26,6 +27,7 @@ const ICONS = {
   trials: Gift,
   files: FolderOpen,
   settings: Settings,
+  download: Download,
   plus: Plus,
 } satisfies Record<string, LucideIcon>;
 

@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { leadFormSchema, type LeadFormValues } from "@/lib/validation";
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, leadStatusLabel, type LeadRow } from "@/lib/leads";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
+import { Pagination } from "@/components/pagination";
 import { TextField, EmailField, TextareaField, SelectField, ReqMark } from "@/components/fields";
 import { AppSelect } from "@/components/app-select";
 import { SearchInput } from "@/components/search-input";
@@ -319,6 +320,8 @@ export function AgentLeadsBrowser() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [statusFilter, setStatusFilter] = useState("");
   const [accountCreated, setAccountCreated] = useState("");
   const [createdFrom, setCreatedFrom] = useState("");
@@ -378,6 +381,10 @@ export function AgentLeadsBrowser() {
     if (createdTo && day > createdTo) return false;
     return true;
   });
+
+  const pages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(page, pages);
+  const pageRows = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   const FIELD_LABELS: Record<string, string> = {
     name: "Name",
@@ -512,6 +519,7 @@ export function AgentLeadsBrowser() {
     setAccountCreated(draftAccountCreated);
     setCreatedFrom(draftFrom);
     setCreatedTo(draftTo);
+    setPage(1);
     setFilterOpen(false);
   };
 
@@ -524,6 +532,7 @@ export function AgentLeadsBrowser() {
     setAccountCreated("");
     setCreatedFrom("");
     setCreatedTo("");
+    setPage(1);
     setFilterOpen(false);
   };
 
@@ -544,7 +553,7 @@ export function AgentLeadsBrowser() {
       </div>
 
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <SearchInput className="w-full sm:max-w-xs" placeholder="Search" value={q} onSearch={setQ} />
+        <SearchInput className="w-full sm:max-w-xs" placeholder="Search" value={q} onSearch={(v) => { setQ(v); setPage(1); }} />
         <button
           type="button"
           onClick={openFilter}
@@ -588,9 +597,22 @@ export function AgentLeadsBrowser() {
         loading={loading}
         emptyMessage="No leads assigned yet. Send a request to your admin."
         rowKey={(l) => l.id}
-        rows={filtered}
+        rows={pageRows}
         columns={columns}
       />
+
+      {filtered.length >= 10 && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <Pagination
+            page={safePage}
+            pages={pages}
+            total={filtered.length}
+            perPage={perPage}
+            onPage={setPage}
+            onPerPageChange={(n) => { setPerPage(n); setPage(1); }}
+          />
+        </div>
+      )}
 
       <ConfirmDialog
         open={requestOpen}

@@ -2,7 +2,7 @@ import { config } from "../config";
 
 // Branded HTML email wrapper — logo + card layout, works in major clients.
 export function emailShell(title: string, bodyHtml: string) {
-  const logoUrl = `${config.appUrl}/logo.png`;
+  const logoUrl = config.logoUrl;
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
   <div style="max-width:560px;margin:0 auto;padding:32px 16px;">

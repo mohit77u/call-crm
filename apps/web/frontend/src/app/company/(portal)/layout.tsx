@@ -17,6 +17,7 @@ export default async function CrmLayout({ children }: LayoutProps<"/">) {
         ] as NavLink[])
       : []),
     { href: "/company/agents", label: "Agents", icon: "agents" },
+    { href: "/company/download-app", label: "Download app", icon: "download" },
     { href: "/company/settings", label: "Settings", icon: "settings" },
   ];
   return (

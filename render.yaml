@@ -30,6 +30,8 @@ services:
         sync: false # set to your Vercel frontend URL, e.g. https://call-crm.vercel.app
       - key: APP_URL
         sync: false # same Vercel URL — used in password reset emails
+      - key: LOGO_URL
+        sync: false # optional — defaults to <APP_URL>/logo.png
       - key: SUPERADMIN_EMAILS
         sync: false
       - key: SUPERADMIN_PASSWORD

@@ -23,6 +23,10 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   appUrl: (process.env.APP_URL ?? "http://localhost:3050").replace(/\/$/, ""),
+  // Public URL of the logo used in emails. Defaults to <appUrl>/logo.png;
+  // set LOGO_URL to override (e.g. a CDN-hosted image).
+  logoUrl: (process.env.LOGO_URL?.trim() || "").replace(/\/+$/, "") ||
+    `${(process.env.APP_URL ?? "http://localhost:3050").replace(/\/+$/, "")}/logo.png`,
   // Public URL of this API as seen from the internet — used for startup logs.
   // Set PUBLIC_URL explicitly, or it is derived from platform env vars.
   publicUrl: (() => {
