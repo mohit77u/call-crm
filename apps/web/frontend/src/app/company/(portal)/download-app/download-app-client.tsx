@@ -11,6 +11,7 @@ const APK_PATH = "/downloads/call-crm.apk";
 function apkUrl() {
   const env = process.env.NEXT_PUBLIC_APP_APK_URL?.trim();
   if (env) return env;
+  if (typeof window === "undefined") return APK_PATH;
   return `${window.location.origin}${APK_PATH}`;
 }
 
@@ -22,11 +23,16 @@ export function DownloadAppClient() {
     digits.length === 10 ? `91${digits}` : digits.length === 12 && digits.startsWith("91") ? digits : "";
   const phoneInvalid = digits.length > 0 && !waNumber;
 
-  function shareHref() {
+  function openWhatsApp() {
+    if (phoneInvalid) {
+      notify.error("Enter a valid 10-digit phone number");
+      return;
+    }
     const text = `Download the Call CRM app to track calls: ${apkUrl()}`;
-    return waNumber
+    const url = waNumber
       ? `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`
       : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -65,20 +71,13 @@ export function DownloadAppClient() {
           className="mt-3 h-10 w-full rounded-md border border-slate-300 px-3 text-sm text-slate-800 outline-none focus:border-[var(--primary)]"
         />
         {phoneInvalid && <p className="mt-1.5 text-xs text-red-500">Enter a valid 10-digit number</p>}
-        <a
-          href={shareHref()}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => {
-            if (phoneInvalid) {
-              e.preventDefault();
-              notify.error("Enter a valid 10-digit phone number");
-            }
-          }}
+        <button
+          type="button"
+          onClick={openWhatsApp}
           className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
         >
           <MessageCircle size={15} className="text-green-600" /> Share download link
-        </a>
+        </button>
       </div>
     </div>
   );
