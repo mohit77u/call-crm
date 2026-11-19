@@ -96,7 +96,7 @@ function EditableText({
     </span>
   );
   return value ? (
-    <Tooltip label={value} multiline={multiline} w="auto" maw={340} position="top" withArrow openDelay={200}>
+    <Tooltip label={value} multiline={multiline} w="auto" maw={multiline ? 340 : 520} position="top" withArrow openDelay={200}>
       {display}
     </Tooltip>
   ) : (
@@ -435,17 +435,17 @@ export function AgentLeadsBrowser({ mode = "leads" }: { mode?: "leads" | "active
   const columns: DataTableColumn<LeadRow>[] = [
     {
       header: "Name",
-      className: "w-[210px] whitespace-normal",
+      className: "w-[210px] max-w-[210px] whitespace-normal",
       cell: (l) => <EditableText value={l.name} onSave={(v) => saveField(l, { name: v })} className="font-medium" multiline validate={requireName} />,
     },
     {
       header: "Phone",
-      className: "w-[160px] whitespace-nowrap",
+      className: "w-[160px] max-w-[160px] whitespace-nowrap",
       cell: (l) => <EditableText value={l.phone} onSave={(v) => saveField(l, { phone: v || null })} validate={optionalPhone} />,
     },
     {
       header: "Email",
-      className: "w-[240px] whitespace-nowrap",
+      className: "w-[240px] max-w-[240px] whitespace-nowrap",
       cell: (l) => <EditableText value={l.email} onSave={(v) => saveField(l, { email: v || null })} inputClassName="w-[205px]" validate={optionalEmail} />,
     },
     {
