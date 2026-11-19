@@ -485,6 +485,7 @@ export function AgentLeadsBrowser() {
           </span>
         ),
     },
+    { header: "Assigned", className: "whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.assignedAt)}</span> },
     { header: "Created", className: "whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.createdAt)}</span> },
     { header: "Updated", className: "whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.updatedAt)}</span> },
     {

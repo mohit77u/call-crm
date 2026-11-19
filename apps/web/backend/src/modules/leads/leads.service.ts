@@ -64,7 +64,7 @@ export async function agentListLeads(agent: AgentContext) {
   const rows = await AppDataSource.query(
     `SELECT ${COLS} FROM leads
      WHERE company_id = $1 AND assigned_agent_id = $2 AND deleted_at IS NULL
-     ORDER BY created_at DESC, id DESC LIMIT 500`,
+     ORDER BY assigned_at DESC NULLS LAST, created_at DESC, id DESC LIMIT 500`,
     [agent.companyId, agent.agentId],
   );
   return withNormalizedPhones(rows);
