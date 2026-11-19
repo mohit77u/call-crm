@@ -30,11 +30,6 @@ function fmtDate(iso: string) {
   return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function fmtDateTime(iso: string) {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
 function ClientFormModal({
   client,
   agents,
@@ -149,14 +144,10 @@ function colLetter(i: number) {
 
 function ImportClientsModal({
   apiBase,
-  agents,
-  showAssign,
   onClose,
   onDone,
 }: {
   apiBase: string;
-  agents: AgentOption[];
-  showAssign: boolean;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -164,8 +155,6 @@ function ImportClientsModal({
   const [step, setStep] = useState<1 | 2>(1);
   const [file, setFile] = useState<File | null>(null);
   const [hasHeader, setHasHeader] = useState(true);
-  const [assignMode, setAssignMode] = useState<"none" | "agent" | "roundrobin" | "random">("none");
-  const [assignAgent, setAssignAgent] = useState("");
   const [busy, setBusy] = useState<"" | "upload" | "confirm">("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [mapping, setMapping] = useState<Mapping>({ clientCode: null, name: null, phone: null, email: null, address: null, panCard: null });
@@ -191,10 +180,6 @@ function ImportClientsModal({
     setBusy("upload");
     try {
       const qs = new URLSearchParams({ hasHeader: hasHeader ? "1" : "0", fileName: file.name });
-      if (showAssign) {
-        qs.set("assign", assignMode);
-        if (assignMode === "agent" && assignAgent) qs.set("agentId", assignAgent);
-      }
       const res = await fetch(`${apiBase}/import-file?${qs}`, {
         method: "POST",
         headers: { "content-type": "application/octet-stream" },
@@ -227,7 +212,6 @@ function ImportClientsModal({
     for (const f of IMPORT_FIELDS.filter((x) => x.required)) {
       if (mapping[f.key] == null) return notify.error(`Map the ${f.label} column`);
     }
-    if (showAssign && assignMode === "agent" && !assignAgent) return notify.error("Select an agent");
     setBusy("confirm");
     try {
       const body: Record<string, number> = {};
@@ -304,34 +288,6 @@ function ImportClientsModal({
               </span>
               <span className="pl-6 text-xs text-slate-400">Uncheck if your file has no header row</span>
             </label>
-
-            {showAssign ? (
-              <div>
-                <p className="mb-2 text-sm font-medium text-slate-700">Assign imported clients to</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <AppSelect
-                    value={assignMode}
-                    onChange={(v) => v && setAssignMode(v as typeof assignMode)}
-                    data={[
-                      { value: "none", label: "My clients (-)" },
-                      { value: "agent", label: "Specific agent" },
-                      { value: "roundrobin", label: "Round robin" },
-                      { value: "random", label: "Random agents" },
-                    ]}
-                  />
-                  {assignMode === "agent" ? (
-                    <AppSelect
-                      value={assignAgent || null}
-                      onChange={(v) => setAssignAgent(v ?? "")}
-                      placeholder="Select agent"
-                      data={agents.filter((a) => a.active !== false).map((a) => ({ value: String(a.id), label: a.name }))}
-                    />
-                  ) : (
-                    <div className="hidden sm:block" />
-                  )}
-                </div>
-              </div>
-            ) : null}
 
             <div className="flex justify-end gap-2">
               <button type="button" onClick={onClose} disabled={busyNow} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
@@ -530,11 +486,6 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
         cell: (c) => <span className="whitespace-nowrap text-xs text-slate-500">{fmtDate(c.createdAt)}</span>,
       },
       {
-        header: "Updated",
-        className: "w-[140px] whitespace-nowrap",
-        cell: (c) => <span className="whitespace-nowrap text-xs text-slate-500">{fmtDateTime(c.updatedAt)}</span>,
-      },
-      {
         header: "",
         className: "w-[72px] text-right",
         cell: (c) => (
@@ -543,17 +494,19 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
               type="button"
               title="Edit"
               onClick={() => openEdit(c)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Edit client"
+              className="inline-flex items-center justify-center rounded-md bg-slate-200 p-2.5 text-slate-700 transition-colors hover:bg-slate-300"
             >
-              <Pencil size={13} />
+              <Pencil size={12} strokeWidth={2.2} color="#334155" />
             </button>
             <button
               type="button"
               title="Delete"
               onClick={() => setDeleteTarget(c)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
+              aria-label="Delete client"
+              className="inline-flex items-center justify-center rounded-md bg-red-50 p-2.5 text-red-500 transition-colors hover:bg-red-100"
             >
-              <Trash2 size={13} />
+              <Trash2 size={12} strokeWidth={2.2} />
             </button>
           </div>
         ),
@@ -620,7 +573,11 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       ) : (
         <>
           <DataTable columns={columns} rows={paged} rowKey={(c) => c.id} />
-          <Pagination page={safePage} pages={totalPages} total={filtered.length} perPage={perPage} onPage={setPage} onPerPageChange={(n) => { setPerPage(n); setPage(1); }} />
+          {filtered.length >= PER_PAGE && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <Pagination page={safePage} pages={totalPages} total={filtered.length} perPage={perPage} onPage={setPage} onPerPageChange={(n) => { setPerPage(n); setPage(1); }} />
+            </div>
+          )}
         </>
       )}
 
@@ -637,8 +594,6 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       {importOpen ? (
         <ImportClientsModal
           apiBase={apiBase}
-          agents={agents}
-          showAssign={isAdmin}
           onClose={() => setImportOpen(false)}
           onDone={load}
         />

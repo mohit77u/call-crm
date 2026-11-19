@@ -12,3 +12,6 @@ apps/mobile/modules/call-log/android/build/
 
 # APK downloads served by the web app
 !apps/web/frontend/public/downloads/*.apk
+
+# local DB backups
+apps/web/backend/backups/

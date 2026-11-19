@@ -156,28 +156,19 @@ crmClientsRouter.get(
   }),
 );
 
-const assignSchema = z.object({
-  mode: z.enum(["none", "agent", "roundrobin", "random"]).optional(),
-  agentId: z.number().int().positive().nullish(),
-});
-
 crmClientsRouter.post(
   "/import-file",
   raw({ type: "application/octet-stream", limit: "8mb" }),
   asyncHandler(async (req, res) => {
     const buffer = req.body as Buffer;
     if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw badRequest("Empty file");
-    const assign = parse(assignSchema, {
-      mode: q(req.query.assign) || undefined,
-      agentId: /^\d+$/.test(q(req.query.agentId)) ? Number(q(req.query.agentId)) : null,
-    });
     const rec = await clientsService.createClientImport(
       { companyId: req.admin!.companyId, agentId: null, adminId: req.admin!.adminId },
       {
         buffer,
         fileName: q(req.query.fileName) || "import",
         hasHeader: q(req.query.hasHeader) !== "0" && q(req.query.hasHeader) !== "false",
-        assign: { mode: assign.mode ?? "none", agentId: assign.agentId ?? null },
+        assign: { mode: "none", agentId: null },
       },
     );
     res.status(201).json({ importId: rec.id, status: "awaiting_mapping", headers: rec.headers, mapping: rec.mapping });
