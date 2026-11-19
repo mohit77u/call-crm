@@ -14,6 +14,7 @@ import {
   Settings,
   UserPlus,
   Users,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ const ICONS = {
   settings: Settings,
   download: Download,
   plus: Plus,
+  active: Zap,
 } satisfies Record<string, LucideIcon>;
 
 export type SidebarIcon = keyof typeof ICONS;

@@ -31,6 +31,7 @@ export type LeadRow = {
   accountCreated: boolean;
   requestStatus: "pending" | "approved" | "rejected" | null;
   assignedAt: string | null;
+  agentTouchedAt?: string | null;
   lastContactedAt: string | null;
   createdAt: string;
   updatedAt: string;

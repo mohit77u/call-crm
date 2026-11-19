@@ -9,7 +9,8 @@ const COLS = `id, company_id AS "companyId", assigned_agent_id AS "assignedAgent
   requested_by_agent_id AS "requestedByAgentId", created_by_type AS "createdByType",
   created_by_id AS "createdById", source, name, phone, email, notes, status,
   account_created AS "accountCreated", request_status AS "requestStatus",
-  assigned_at AS "assignedAt", last_contacted_at AS "lastContactedAt",
+  assigned_at AS "assignedAt", agent_touched_at AS "agentTouchedAt",
+  last_contacted_at AS "lastContactedAt",
   created_at AS "createdAt", updated_at AS "updatedAt"`;
 
 const COLS_L = `l.id, l.company_id AS "companyId", l.assigned_agent_id AS "assignedAgentId",
@@ -63,15 +64,26 @@ async function assertPhoneAvailable(companyId: number, phone: string | null, exc
 export async function agentListLeads(agent: AgentContext) {
   const rows = await AppDataSource.query(
     `SELECT ${COLS} FROM leads
-     WHERE company_id = $1 AND assigned_agent_id = $2 AND deleted_at IS NULL
+     WHERE company_id = $1 AND assigned_agent_id = $2 AND deleted_at IS NULL AND agent_touched_at IS NULL
      ORDER BY assigned_at DESC NULLS LAST, created_at DESC, id DESC LIMIT 500`,
     [agent.companyId, agent.agentId],
   );
   return withNormalizedPhones(rows);
 }
 
-export async function agentExportLeadsRows(agent: AgentContext, filters: { status?: string; q?: string; accountCreated?: string; createdFrom?: string; createdTo?: string }) {
+export async function agentActiveLeads(agent: AgentContext) {
+  const rows = await AppDataSource.query(
+    `SELECT ${COLS} FROM leads
+     WHERE company_id = $1 AND assigned_agent_id = $2 AND deleted_at IS NULL AND agent_touched_at IS NOT NULL
+     ORDER BY updated_at DESC, id DESC LIMIT 500`,
+    [agent.companyId, agent.agentId],
+  );
+  return withNormalizedPhones(rows);
+}
+
+export async function agentExportLeadsRows(agent: AgentContext, filters: { status?: string; q?: string; accountCreated?: string; createdFrom?: string; createdTo?: string; scope?: string }) {
   const where = ["l.company_id = $1", "l.assigned_agent_id = $2", "l.deleted_at IS NULL", "(l.request_status IS NULL OR l.request_status = 'approved')"];
+  where.push(filters.scope === "active" ? "l.agent_touched_at IS NOT NULL" : "l.agent_touched_at IS NULL");
   const params: unknown[] = [agent.companyId, agent.agentId];
   if (filters.status && isLeadStatus(filters.status)) {
     params.push(filters.status);
@@ -155,6 +167,9 @@ export async function agentUpdateLead(agent: AgentContext, id: number, patch: Re
     push("account_created", v === true);
   }
 
+  if ("notes" in patch || "status" in patch) {
+    sets.push("agent_touched_at = COALESCE(agent_touched_at, now())");
+  }
   if (sets.length === 0) throw badRequest("Nothing to update");
   sets.push("updated_at = now()");
   const updated = await AppDataSource.query(

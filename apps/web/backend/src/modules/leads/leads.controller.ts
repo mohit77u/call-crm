@@ -74,6 +74,13 @@ agentLeadsRouter.get(
 );
 
 agentLeadsRouter.get(
+  "/active",
+  asyncHandler(async (req, res) => {
+    res.json({ leads: await leadsService.agentActiveLeads(req.agent!) });
+  }),
+);
+
+agentLeadsRouter.get(
   "/requests",
   asyncHandler(async (req, res) => {
     res.json({ requests: await leadsService.agentMyRequests(req.agent!) });
@@ -89,6 +96,7 @@ agentLeadsRouter.get(
       accountCreated: q(req.query.accountCreated),
       createdFrom: q(req.query.createdFrom),
       createdTo: q(req.query.createdTo),
+      scope: q(req.query.scope),
     });
     const fmt = (v: unknown) => (v ? new Date(String(v)).toLocaleString("en-IN", { timeZone: TIME_ZONE }) : "");
     sendCsv(

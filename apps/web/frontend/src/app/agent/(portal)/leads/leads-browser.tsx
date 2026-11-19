@@ -324,7 +324,8 @@ function NotesModal({ lead, onClose, onSave }: { lead: LeadRow | null; onClose: 
 
 const ALL = "__all__";
 
-export function AgentLeadsBrowser() {
+export function AgentLeadsBrowser({ mode = "leads" }: { mode?: "leads" | "active" }) {
+  const isActive = mode === "active";
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -349,7 +350,7 @@ export function AgentLeadsBrowser() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/agent/leads");
+      const res = await fetch(isActive ? "/api/agent/leads/active" : "/api/agent/leads");
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Failed to load leads");
       const data = await res.json();
       setLeads(data.leads ?? []);
@@ -358,7 +359,7 @@ export function AgentLeadsBrowser() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isActive]);
 
   useEffect(() => {
     const t = setTimeout(load, 0);
@@ -410,7 +411,11 @@ export function AgentLeadsBrowser() {
       notify.error(res.error);
       return res;
     }
-    setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, ...patch, updatedAt: new Date().toISOString() } : l)));
+    if (!isActive && ("notes" in patch || "status" in patch)) {
+      setLeads((prev) => prev.filter((l) => l.id !== lead.id));
+    } else {
+      setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, ...patch, updatedAt: new Date().toISOString() } : l)));
+    }
     const key = Object.keys(patch)[0] ?? "";
     notify.success(`${lead.name} — ${FIELD_LABELS[key] ?? key} updated`);
     return res;
@@ -548,6 +553,7 @@ export function AgentLeadsBrowser() {
   };
 
   const exportQs = new URLSearchParams();
+  if (isActive) exportQs.set("scope", "active");
   if (q) exportQs.set("q", q);
   if (statusFilter) exportQs.set("status", statusFilter);
   if (accountCreated) exportQs.set("accountCreated", accountCreated);
@@ -558,8 +564,12 @@ export function AgentLeadsBrowser() {
     <>
       <div className="page-head">
         <div>
-          <h1>My leads</h1>
-          <p className="page-sub">{leads.length} assigned lead{leads.length === 1 ? "" : "s"}</p>
+          <h1>{isActive ? "Active leads" : "My leads"}</h1>
+          <p className="page-sub">
+            {isActive
+              ? `${leads.length} lead${leads.length === 1 ? "" : "s"} being worked on`
+              : `${leads.length} assigned lead${leads.length === 1 ? "" : "s"}`}
+          </p>
         </div>
       </div>
 
@@ -592,13 +602,15 @@ export function AgentLeadsBrowser() {
           >
             <Download size={14} /> Export CSV
           </a>
-          <button
-            type="button"
-            onClick={() => setRequestOpen(true)}
-            className="inline-flex h-9 items-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white hover:bg-[var(--primary-dark)]"
-          >
-            + Request leads
-          </button>
+          {!isActive && (
+            <button
+              type="button"
+              onClick={() => setRequestOpen(true)}
+              className="inline-flex h-9 items-center rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white hover:bg-[var(--primary-dark)]"
+            >
+              + Request leads
+            </button>
+          )}
         </div>
       </div>
 
@@ -606,7 +618,7 @@ export function AgentLeadsBrowser() {
 
       <DataTable
         loading={loading}
-        emptyMessage="No leads assigned yet. Send a request to your admin."
+        emptyMessage={isActive ? "No active leads yet. Update notes or status on a lead and it will move here." : "No leads assigned yet. Send a request to your admin."}
         rowKey={(l) => l.id}
         rows={pageRows}
         columns={columns}
