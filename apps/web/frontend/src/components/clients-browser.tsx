@@ -564,12 +564,26 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">{isAdmin ? "Clients" : "My clients"}</h1>
-          <p className="mt-0.5 text-sm text-slate-500">{isAdmin ? "All clients across agents" : "Your client directory"}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">{isAdmin ? "Clients" : "My clients"}</h1>
+        <p className="mt-0.5 text-sm text-slate-500">{isAdmin ? "All clients across agents" : "Your client directory"}</p>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <SearchInput value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Search clients…" className="w-full sm:max-w-xs" />
+        {isAdmin ? (
+          <AppSelect
+            value={agentFilter}
+            onChange={(v) => { setAgentFilter(v ?? ALL); setPage(1); }}
+            data={[
+              { value: ALL, label: "All agents" },
+              ...agents.map((a) => ({ value: String(a.id), label: a.name })),
+              { value: "none", label: "My clients (-)" },
+            ]}
+            className="sm:w-52"
+          />
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
           <button
             type="button"
             onClick={() => setImportOpen(true)}
@@ -591,23 +605,6 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
             <Plus size={14} /> Add client
           </button>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <SearchInput value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Search clients…" className="w-full sm:max-w-xs" />
-        {isAdmin ? (
-          <AppSelect
-            value={agentFilter}
-            onChange={(v) => { setAgentFilter(v ?? ALL); setPage(1); }}
-            data={[
-              { value: ALL, label: "All agents" },
-              ...agents.map((a) => ({ value: String(a.id), label: a.name })),
-              { value: "none", label: "My clients (-)" },
-            ]}
-            className="sm:w-52"
-          />
-        ) : null}
-        <span className="text-xs text-slate-400 sm:ml-auto">{filtered.length} client{filtered.length === 1 ? "" : "s"}</span>
       </div>
 
       {error ? (
