@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Download, FileSpreadsheet, Pencil, Plus, Trash2, Upload, Users, X } from "lucide-react";
+import { Tooltip } from "@mantine/core";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Pagination } from "@/components/pagination";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -24,6 +25,23 @@ export type ClientActions = {
 
 const PER_PAGE = 10;
 const ALL = "__all__";
+
+function AddressCell({ address }: { address: string | null }) {
+  if (!address) return <span className="text-sm text-slate-400">-</span>;
+  return (
+    <Tooltip
+      label={<span className="whitespace-pre-wrap break-words">{address}</span>}
+      multiline
+      w="auto"
+      maw={400}
+      position="top"
+      withArrow
+      openDelay={200}
+    >
+      <span className="block w-full truncate text-sm text-slate-500">{address}</span>
+    </Tooltip>
+  );
+}
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -464,7 +482,7 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       {
         header: "Address",
         className: "w-[200px] max-w-[200px] whitespace-nowrap",
-        cell: (c) => <span className="block truncate text-slate-500">{c.address || "-"}</span>,
+        cell: (c) => <AddressCell address={c.address} />,
       },
       {
         header: "Pan card",

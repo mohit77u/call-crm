@@ -9,17 +9,37 @@ import { Pagination } from "@/components/pagination";
 
 export type ImportRow = {
   id: number;
+  type: "lead" | "client";
   fileName: string;
   hasHeader: boolean;
   status: "processing" | "completed" | "failed" | string;
   totalRows: number;
   imported: number;
+  updated?: number;
   failed: number;
-  pending: number;
+  pending?: number;
   errorMessage: string | null;
   createdAt: string;
   completedAt: string | null;
 };
+
+const IMPORTS_ENDPOINTS = ["/api/crm/leads/imports", "/api/crm/clients/imports"] as const;
+const TYPE_BY_ENDPOINT = { "/api/crm/leads/imports": "lead", "/api/crm/clients/imports": "client" } as const;
+
+async function fetchAllImports(): Promise<ImportRow[]> {
+  const results = await Promise.all(
+    IMPORTS_ENDPOINTS.map(async (url) => {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) return [] as ImportRow[];
+      const data = (await res.json()) as { imports?: ImportRow[] };
+      const type = TYPE_BY_ENDPOINT[url];
+      return (data.imports ?? []).map((r) => ({ ...r, type }));
+    }),
+  );
+  return results
+    .flat()
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+}
 
 const STATUS_CLS: Record<string, string> = {
   processing: "bg-blue-50 text-blue-600",
@@ -39,11 +59,7 @@ export function ImportsBrowser({ initial }: { initial: ImportRow[] }) {
   async function refresh() {
     setRefreshing(true);
     try {
-      const res = await fetch("/api/crm/leads/imports", { cache: "no-store" });
-      if (res.ok) {
-        const data = (await res.json()) as { imports?: ImportRow[] };
-        if (data.imports) setRows(data.imports);
-      }
+      setRows(await fetchAllImports());
     } catch {
       /* ignore */
     } finally {
@@ -56,11 +72,7 @@ export function ImportsBrowser({ initial }: { initial: ImportRow[] }) {
     if (!hasProcessing) return;
     const t = setInterval(async () => {
       try {
-        const res = await fetch("/api/crm/leads/imports", { cache: "no-store" });
-        if (res.ok) {
-          const data = (await res.json()) as { imports?: ImportRow[] };
-          if (data.imports) setRows(data.imports);
-        }
+        setRows(await fetchAllImports());
       } catch {
         /* keep polling */
       }
@@ -95,7 +107,7 @@ export function ImportsBrowser({ initial }: { initial: ImportRow[] }) {
       </div>
 
       <DataTable
-        rowKey={(r) => r.id}
+        rowKey={(r) => `${r.type}-${r.id}`}
         rows={paged}
         emptyMessage={q ? "No imports match your search." : "No imports yet."}
         columns={[
@@ -105,6 +117,14 @@ export function ImportsBrowser({ initial }: { initial: ImportRow[] }) {
               <span className="inline-flex items-center gap-2 font-medium text-slate-800">
                 <FileSpreadsheet size={15} className="text-slate-400" />
                 {r.fileName}
+              </span>
+            ),
+          },
+          {
+            header: "Type",
+            cell: (r) => (
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-slate-600">
+                {r.type}
               </span>
             ),
           },
@@ -123,15 +143,16 @@ export function ImportsBrowser({ initial }: { initial: ImportRow[] }) {
           },
           { header: "Total", cell: (r) => (r.status === "processing" && r.totalRows === 0 ? "…" : r.totalRows) },
           { header: "Imported", cell: (r) => <span className="font-medium text-emerald-600">{r.imported}</span> },
+          { header: "Updated", cell: (r) => (r.updated != null && r.updated > 0 ? <span className="font-medium text-blue-600">{r.updated}</span> : <span className="muted">{r.updated ?? "—"}</span>) },
           { header: "Failed", cell: (r) => (r.failed > 0 ? <span className="font-medium text-red-500">{r.failed}</span> : <span className="muted">0</span>) },
-          { header: "Pending", cell: (r) => (r.pending > 0 ? r.pending : <span className="muted">0</span>) },
+          { header: "Pending", cell: (r) => ((r.pending ?? 0) > 0 ? r.pending : <span className="muted">0</span>) },
           {
             header: "",
             className: "sticky right-0 z-10 min-w-[110px] bg-white",
             cell: (r) =>
               r.status === "completed" && r.failed > 0 ? (
                 <a
-                  href={`/api/crm/leads/imports/${r.id}/errors.csv`}
+                  href={`/api/crm/${r.type === "client" ? "clients" : "leads"}/imports/${r.id}/errors.csv`}
                   className="inline-flex items-center gap-1.5 rounded-md bg-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-300"
                 >
                   <Download size={12} /> Error file

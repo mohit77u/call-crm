@@ -329,9 +329,10 @@ export async function createClientImport(
 
 export async function listClientImports(companyId: number) {
   return AppDataSource.query(
-    `SELECT id, file_name AS "fileName", status, total_rows AS "totalRows", imported, updated, failed,
+    `SELECT id, file_name AS "fileName", has_header AS "hasHeader", status,
+            total_rows AS "totalRows", imported, updated, failed,
             error_message AS "errorMessage", created_at AS "createdAt", completed_at AS "completedAt"
-     FROM client_imports WHERE company_id = $1 ORDER BY created_at DESC LIMIT 20`,
+     FROM client_imports WHERE company_id = $1 AND status <> 'awaiting_mapping' ORDER BY created_at DESC LIMIT 100`,
     [companyId],
   );
 }
