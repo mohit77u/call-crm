@@ -49,12 +49,13 @@ function NotesCell({ notes }: { notes: string | null }) {
     <Tooltip
       label={<span className="whitespace-pre-wrap break-words">{notes}</span>}
       multiline
-      w={280}
+      w="auto"
+      maw={400}
       position="top"
       withArrow
       openDelay={200}
     >
-      <span className="line-clamp-2 max-w-[300px] break-words text-sm text-slate-600">{notes}</span>
+      <span className="block w-full truncate text-sm text-slate-600">{notes}</span>
     </Tooltip>
   );
 }
@@ -476,7 +477,7 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     },
     {
       header: "Notes",
-      className: "min-w-[220px] whitespace-normal",
+      className: "w-[240px] max-w-[240px] whitespace-nowrap",
       cell: (l) => <NotesCell notes={l.notes} />,
     },
     {

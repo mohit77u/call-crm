@@ -126,4 +126,20 @@ export type ProfileFormValues = z.infer<typeof profileFormSchema>;
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 export type CreateAgentValues = z.infer<typeof createAgentSchema>;
 export type ResetAgentPasswordValues = z.infer<typeof resetAgentPasswordSchema>;
+export const clientFormSchema = z.object({
+  clientCode: z
+    .string()
+    .trim()
+    .min(1, "Client code is required")
+    .max(50, "Client code must be 50 characters or less")
+    .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "Letters, numbers, - and _ only"),
+  name: z.string().trim().min(1, "Name is required").max(200),
+  phone: z.string().trim().refine((v) => v.replace(/\D/g, "").length >= 10, "Enter a valid phone number"),
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email").max(200),
+  address: z.string().max(1000).optional(),
+  panCard: z.string().max(30).optional(),
+  agentId: z.number().int().positive().nullable().optional(),
+});
+
 export type FreeTrialFormValues = z.infer<typeof freeTrialFormSchema>;
+export type ClientFormValues = z.infer<typeof clientFormSchema>;

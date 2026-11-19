@@ -290,12 +290,21 @@ function NotesModal({ lead, onClose, onSave }: { lead: LeadRow | null; onClose: 
   if (!lead) return null;
 
   function submit() {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      notify.error("Notes is required");
+      return;
+    }
+    if (trimmed.replace(/\s/g, "").length < 3) {
+      notify.error("Notes must be at least 3 characters");
+      return;
+    }
     if (value.length > 2000) {
       notify.error("Notes must be 2000 characters or less");
       return;
     }
     startTransition(async () => {
-      const res = await onSave(value.trim());
+      const res = await onSave(trimmed);
       if (!res.error) onClose();
     });
   }
@@ -308,7 +317,7 @@ function NotesModal({ lead, onClose, onSave }: { lead: LeadRow | null; onClose: 
         </span>
         <h3 className="mb-1 pr-6 text-base font-semibold text-slate-900">Notes — {lead.name}</h3>
         <p className="mb-3 text-xs text-slate-400">{lead.phone ?? lead.email ?? ""}</p>
-        <TextareaField name="notes" label="Notes" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Add notes" autosize minRows={4} maxRows={10} />
+        <TextareaField name="notes" label={<>Notes<ReqMark /></>} value={value} onChange={(e) => setValue(e.target.value)} placeholder="Add notes" autosize minRows={4} maxRows={10} />
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={pending} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
             Cancel
@@ -450,13 +459,14 @@ export function AgentLeadsBrowser({ mode = "leads" }: { mode?: "leads" | "active
     },
     {
       header: "Notes",
-      className: "min-w-[180px]",
+      className: "w-[200px] max-w-[200px] whitespace-nowrap",
       cell: (l) =>
         l.notes ? (
           <Tooltip
             label={<span className="whitespace-pre-wrap break-words">{l.notes}</span>}
             multiline
-            w={280}
+            w="auto"
+            maw={400}
             position="top"
             withArrow
             openDelay={200}
@@ -466,7 +476,7 @@ export function AgentLeadsBrowser({ mode = "leads" }: { mode?: "leads" | "active
               tabIndex={0}
               onClick={() => setNotesFor(l)}
               onKeyDown={(e) => e.key === "Enter" && setNotesFor(l)}
-              className="line-clamp-2 block max-w-[220px] cursor-text break-words text-sm text-slate-600"
+              className="block w-full cursor-text truncate text-sm text-slate-600"
             >
               {l.notes}
             </span>

@@ -12,6 +12,7 @@ export default async function CrmLayout({ children }: LayoutProps<"/">) {
     ...(hasFeature(admin, "leadManagement")
       ? ([
           { href: "/company/leads", label: "Leads", icon: "leads" },
+          { href: "/company/clients", label: "Clients", icon: "clients" },
           { href: "/company/trials", label: "Free trial", icon: "trials" },
           { href: "/company/imported-files", label: "Imported files", icon: "files" },
         ] as NavLink[])

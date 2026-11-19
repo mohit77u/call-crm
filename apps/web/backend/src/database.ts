@@ -218,6 +218,48 @@ CREATE INDEX IF NOT EXISTS lead_imports_company ON lead_imports (company_id, cre
 ALTER TABLE lead_imports ADD COLUMN IF NOT EXISTS file_headers JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE lead_imports ADD COLUMN IF NOT EXISTS column_mapping JSONB;
 ALTER TABLE lead_imports ADD COLUMN IF NOT EXISTS cursor INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS clients (
+  id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  agent_id INT REFERENCES agents(id) ON DELETE SET NULL,
+  client_code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  email TEXT NOT NULL,
+  address TEXT,
+  pan_card TEXT,
+  created_by_type TEXT,
+  created_by_id INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS clients_company_code ON clients (company_id, client_code) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS clients_company ON clients (company_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS clients_agent ON clients (agent_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS client_imports (
+  id SERIAL PRIMARY KEY,
+  company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  agent_id INT REFERENCES agents(id) ON DELETE SET NULL,
+  admin_id INT,
+  file_name TEXT NOT NULL,
+  file_headers JSONB NOT NULL DEFAULT '[]'::jsonb,
+  rows JSONB NOT NULL DEFAULT '[]'::jsonb,
+  has_header BOOLEAN NOT NULL DEFAULT true,
+  column_mapping JSONB,
+  assign_mode TEXT NOT NULL DEFAULT 'none',
+  assign_agent_id INT,
+  status TEXT NOT NULL DEFAULT 'awaiting_mapping',
+  total_rows INT NOT NULL DEFAULT 0,
+  imported INT NOT NULL DEFAULT 0,
+  updated INT NOT NULL DEFAULT 0,
+  failed INT NOT NULL DEFAULT 0,
+  error_rows JSONB NOT NULL DEFAULT '[]'::jsonb,
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS client_imports_company ON client_imports (company_id, created_at DESC);
 `;
 
 // TypeORM's query() returns [rows, affectedCount] for UPDATE/DELETE but a plain

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   Contact,
+  IdCard,
   Download,
   FolderOpen,
   Gift,
@@ -25,6 +26,7 @@ const ICONS = {
   calls: Phone,
   newCompany: UserPlus,
   leads: Contact,
+  clients: IdCard,
   trials: Gift,
   files: FolderOpen,
   settings: Settings,
