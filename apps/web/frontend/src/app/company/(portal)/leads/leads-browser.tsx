@@ -504,7 +504,9 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     {
       header: "",
       className: "sticky right-0 z-10 min-w-[96px] bg-white",
-      cell: (l) => (
+      cell: (l) => {
+        const protectedStatus = l.status === "interested" || l.status === "follow_up";
+        return (
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -518,14 +520,16 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
           <button
             type="button"
             onClick={() => setDeleteTarget(l)}
+            disabled={protectedStatus}
             aria-label="Delete lead"
-            title="Delete"
-            className="inline-flex items-center justify-center rounded-md bg-red-50 p-2.5 text-red-500 transition-colors hover:bg-red-100"
+            title={protectedStatus ? "Interested/Follow up leads can't be deleted" : "Delete"}
+            className="inline-flex items-center justify-center rounded-md bg-red-50 p-2.5 text-red-500 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 size={12} strokeWidth={2.2} />
           </button>
         </div>
-      ),
+        );
+      },
     },
   ];
 
@@ -757,9 +761,10 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
         onClose={() => setBulkDelete(null)}
         title={bulkDelete === "all" ? "Delete all leads?" : "Delete selected leads?"}
         message={
-          bulkDelete === "all"
+          (bulkDelete === "all"
             ? `This will delete ALL ${data?.total ?? 0} leads. This cannot be undone.`
-            : `Delete ${selectedIds.size} selected lead${selectedIds.size === 1 ? "" : "s"}? This cannot be undone.`
+            : `Delete ${selectedIds.size} selected lead${selectedIds.size === 1 ? "" : "s"}? This cannot be undone.`) +
+          " Interested/Follow up leads will be skipped."
         }
         confirmLabel="Delete"
         danger

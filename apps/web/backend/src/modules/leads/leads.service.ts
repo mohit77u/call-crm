@@ -338,12 +338,28 @@ export async function adminUpdateLead(admin: AdminContext, id: number, patch: Re
   return returnedRows(updated)[0];
 }
 
+// Leads in these statuses cannot be deleted.
+const UNDELETABLE_STATUSES = ["interested", "follow_up"];
+const DELETABLE_CLAUSE = `status NOT IN ('interested','follow_up')`;
+const PROTECTED_COUNT_SQL = `status IN ('interested','follow_up')`;
+
 export async function adminDeleteLead(admin: AdminContext, id: number) {
-  const rows = await AppDataSource.query(
-    "UPDATE leads SET deleted_at = now(), updated_at = now() WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL RETURNING id",
-    [id, admin.companyId],
+  const rows = returnedRows(
+    await AppDataSource.query(
+      `UPDATE leads SET deleted_at = now(), updated_at = now()
+       WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL AND ${DELETABLE_CLAUSE} RETURNING id`,
+      [id, admin.companyId],
+    ),
   );
-  if (!rows[0]) throw notFound("Lead not found");
+  if (!rows[0]) {
+    const chk = await AppDataSource.query(
+      "SELECT status FROM leads WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL",
+      [id, admin.companyId],
+    );
+    const existing = returnedRows<{ status: string }>(chk)[0];
+    if (!existing) throw notFound("Lead not found");
+    throw badRequest(`Leads with status '${existing.status === "follow_up" ? "Follow up" : "Interested"}' cannot be deleted`);
+  }
   return { deleted: true };
 }
 
@@ -354,12 +370,20 @@ export async function adminDeleteLeadsBulk(admin: AdminContext, input: { ids?: n
   const rows = returnedRows(
     await AppDataSource.query(
       input.all
-        ? "UPDATE leads SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND deleted_at IS NULL RETURNING id"
-        : "UPDATE leads SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = ANY($2::int[]) AND deleted_at IS NULL RETURNING id",
+        ? `UPDATE leads SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND deleted_at IS NULL AND ${DELETABLE_CLAUSE} RETURNING id`
+        : `UPDATE leads SET deleted_at = now(), updated_at = now() WHERE company_id = $1 AND id = ANY($2::int[]) AND deleted_at IS NULL AND ${DELETABLE_CLAUSE} RETURNING id`,
       input.all ? [admin.companyId] : [admin.companyId, ids],
     ),
   );
-  return { deleted: rows.length, requested };
+  const protectedRows = returnedRows<{ n: number }>(
+    await AppDataSource.query(
+      input.all
+        ? `SELECT count(*)::int AS n FROM leads WHERE company_id = $1 AND deleted_at IS NULL AND ${PROTECTED_COUNT_SQL}`
+        : `SELECT count(*)::int AS n FROM leads WHERE company_id = $1 AND id = ANY($2::int[]) AND deleted_at IS NULL AND ${PROTECTED_COUNT_SQL}`,
+      input.all ? [admin.companyId] : [admin.companyId, ids],
+    ),
+  );
+  return { deleted: rows.length, requested, skipped: protectedRows[0]?.n ?? 0 };
 }
 
 // Assigns leads to an agent. When `leadIds` is given, exactly those leads are

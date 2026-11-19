@@ -61,18 +61,23 @@ export async function deleteLead(id: number): Promise<LeadActionState> {
   }
 }
 
-export async function deleteLeadsBulk(input: { ids?: number[]; all?: boolean }): Promise<LeadActionState & { deleted?: number; requested?: number }> {
+export async function deleteLeadsBulk(input: { ids?: number[]; all?: boolean }): Promise<LeadActionState & { deleted?: number; requested?: number; skipped?: number }> {
   await requireAdmin();
   try {
-    const res = await apiFetch<{ deleted: number; requested: number }>("/api/crm/leads/bulk-delete", { body: input, token: await getAdminToken() });
-    const skipped = res.requested > 0 ? res.requested - res.deleted : 0;
+    const res = await apiFetch<{ deleted: number; requested: number; skipped?: number }>("/api/crm/leads/bulk-delete", { body: input, token: await getAdminToken() });
+    const protectedSkipped = res.skipped ?? 0;
+    const gone = res.requested > 0 ? res.requested - res.deleted - protectedSkipped : 0;
+    const extras: string[] = [];
+    if (protectedSkipped > 0) extras.push(`${protectedSkipped} skipped (Interested/Follow up can't be deleted)`);
+    if (gone > 0) extras.push(`${gone} already removed`);
+    const suffix = extras.length ? ` (${extras.join(", ")})` : "";
     const notice =
       res.deleted === 0
-        ? "No leads deleted (already removed)"
-        : skipped > 0
-          ? `${res.deleted} lead${res.deleted === 1 ? "" : "s"} deleted (${skipped} already removed)`
-          : `${res.deleted} lead${res.deleted === 1 ? "" : "s"} deleted`;
-    return { notice, deleted: res.deleted, requested: res.requested };
+        ? protectedSkipped > 0
+          ? `No leads deleted — ${protectedSkipped} lead${protectedSkipped === 1 ? " is" : "s are"} Interested/Follow up and can't be deleted`
+          : "No leads deleted (already removed)"
+        : `${res.deleted} lead${res.deleted === 1 ? "" : "s"} deleted${suffix}`;
+    return { notice, deleted: res.deleted, requested: res.requested, skipped: res.skipped };
   } catch (e) {
     return fail(e, "Could not delete leads");
   }

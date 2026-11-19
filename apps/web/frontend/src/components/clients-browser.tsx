@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Download, FileSpreadsheet, Pencil, Plus, Trash2, Upload, Users, X } from "lucide-react";
-import { Tooltip } from "@mantine/core";
+import { ClampedText } from "@/components/clamped-text";
 import { DataTable, type DataTableColumn } from "@/components/data-table";
 import { Pagination } from "@/components/pagination";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -25,55 +25,6 @@ export type ClientActions = {
 
 const PER_PAGE = 10;
 const ALL = "__all__";
-
-function ClampedText({
-  text,
-  display,
-  capitalize = false,
-  lines = 2,
-  className = "text-slate-600",
-}: {
-  text?: string | null;
-  display?: string | null;
-  capitalize?: boolean;
-  lines?: 1 | 2;
-  className?: string;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [truncated, setTruncated] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const check = () => setTruncated(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [text, display]);
-
-  if (!text) return <span className="text-sm text-slate-400">-</span>;
-  const shown = display ?? text;
-  return (
-    <Tooltip
-      label={<span className={`whitespace-pre-wrap break-words ${capitalize ? "capitalize" : ""}`}>{shown}</span>}
-      multiline
-      w="auto"
-      maw={400}
-      position="top"
-      withArrow
-      openDelay={200}
-      disabled={!truncated}
-    >
-      <span
-        ref={ref}
-        className={`text-sm ${lines === 1 ? "block truncate" : "line-clamp-2 whitespace-normal! wrap-anywhere"} ${capitalize ? "capitalize" : ""} ${className}`}
-      >
-        {shown}
-      </span>
-    </Tooltip>
-  );
-}
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
