@@ -38,6 +38,7 @@ function validateClientInput(input: ClientInput, { partial = false } = {}): Reco
       return;
     }
     out[key] = String(v).trim().slice(0, key === "address" ? 1000 : 200);
+    if (key === "clientCode") out[key] = String(out[key]).toUpperCase();
   };
   if ("clientCode" in input || !partial) need("clientCode", "Client code");
   if ("name" in input || !partial) need("name", "Name");
@@ -57,7 +58,7 @@ function validateClientInput(input: ClientInput, { partial = false } = {}): Reco
     }
   }
   for (const key of ["address", "panCard"] as const) {
-    if (key in input) out[key] = str(input[key], key === "address" ? 1000 : 20);
+    if (key in input) out[key] = key === "panCard" ? str(input[key], 20)?.toUpperCase() ?? null : str(input[key], 1000);
   }
   return out;
 }
@@ -398,12 +399,12 @@ export async function confirmClientImport(
   for (let i = 0; i < dataRows.length; i++) {
     const raw = dataRows[i];
     const get = (f: ClientField) => (clean[f] != null ? String(raw[clean[f]] ?? "").trim() : "");
-    const clientCode = get("clientCode");
+    const clientCode = get("clientCode").toUpperCase();
     const name = get("name");
     const phoneRaw = get("phone");
     const email = get("email").toLowerCase();
     const address = get("address") || null;
-    const panCard = get("panCard") || null;
+    const panCard = get("panCard").toUpperCase() || null;
     const fail = (msg: string) => errors.push({ values: raw, error: msg });
 
     if (!clientCode) { fail("Client code is required"); continue; }

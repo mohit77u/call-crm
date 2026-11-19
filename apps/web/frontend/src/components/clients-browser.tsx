@@ -81,12 +81,14 @@ function ClientFormModal({
         </span>
         <h3 className="mb-4 pr-6 text-base font-semibold text-slate-900">{client ? `Edit client — ${client.name}` : "Add client"}</h3>
         <div className="flex flex-col gap-3">
-          <TextField {...register("clientCode")} label={<>Client code<ReqMark /></>} error={errors.clientCode?.message} placeholder="e.g. C-1001" />
           <TextField {...register("name")} label={<>Name<ReqMark /></>} error={errors.name?.message} />
-          <TextField {...register("phone")} label={<>Phone<ReqMark /></>} error={errors.phone?.message} placeholder="10-digit mobile" />
+          <TextField {...register("phone")} label={<>Phone<ReqMark /></>} error={errors.phone?.message} placeholder="10-digit mobile" maxLength={10} inputMode="numeric" />
           <EmailField {...register("email")} label={<>Email<ReqMark /></>} error={errors.email?.message} />
+          <div className="grid grid-cols-2 gap-3">
+            <TextField {...register("clientCode")} label={<>Client code<ReqMark /></>} error={errors.clientCode?.message} placeholder="e.g. C-1001" maxLength={20} />
+            <TextField {...register("panCard")} label="Pan card" error={errors.panCard?.message} placeholder="ABCDE1234F" maxLength={20} />
+          </div>
           <TextareaField {...register("address")} label="Address" error={errors.address?.message} autosize minRows={2} maxRows={4} />
-          <TextField {...register("panCard")} label="Pan card" error={errors.panCard?.message} placeholder="ABCDE1234F" />
           {showAgent ? (
             <Controller
               control={control}
@@ -461,12 +463,12 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
 
   async function saveClient(data: ClientFormValues): Promise<ClientActionResult> {
     const payload: Record<string, unknown> = {
-      clientCode: data.clientCode.trim(),
+      clientCode: data.clientCode.trim().toUpperCase(),
       name: data.name.trim(),
       phone: data.phone.trim(),
       email: data.email.trim(),
       address: data.address?.trim() || null,
-      panCard: data.panCard?.trim() || null,
+      panCard: data.panCard?.trim().toUpperCase() || null,
     };
     if (isAdmin) payload.agentId = data.agentId ?? null;
     const res = editTarget ? await actions.updateClient(editTarget.id, payload) : await actions.createClient(payload);
@@ -486,7 +488,7 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       {
         header: "Client code",
         className: "w-[120px] max-w-[120px] whitespace-nowrap",
-        cell: (c) => <span className="block truncate font-medium text-slate-800">{c.clientCode}</span>,
+        cell: (c) => <span className="block truncate font-medium uppercase text-slate-800">{c.clientCode}</span>,
       },
       {
         header: "Name",
@@ -511,7 +513,7 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       {
         header: "Pan card",
         className: "w-[120px] max-w-[120px] whitespace-nowrap",
-        cell: (c) => <span className="block truncate text-slate-600">{c.panCard || "-"}</span>,
+        cell: (c) => <span className="block truncate uppercase text-slate-600">{c.panCard || "-"}</span>,
       },
     ];
     if (isAdmin) {

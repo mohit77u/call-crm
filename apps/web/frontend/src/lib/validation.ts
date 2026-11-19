@@ -131,13 +131,13 @@ export const clientFormSchema = z.object({
     .string()
     .trim()
     .min(1, "Client code is required")
-    .max(50, "Client code must be 50 characters or less")
+    .max(20, "Client code must be 20 characters or less")
     .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "Letters, numbers, - and _ only"),
   name: z.string().trim().min(1, "Name is required").max(200),
   phone: z.string().trim().refine((v) => v.replace(/\D/g, "").length >= 10, "Enter a valid phone number"),
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email").max(200),
   address: z.string().max(1000).optional(),
-  panCard: z.string().max(30).optional(),
+  panCard: z.string().max(20).optional(),
   agentId: z.number().int().positive().nullable().optional(),
 });
 
