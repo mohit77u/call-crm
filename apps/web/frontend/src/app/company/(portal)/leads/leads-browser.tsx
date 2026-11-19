@@ -464,6 +464,11 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
       cell: (l) => <span className="text-sm">{l.agentName ?? <span className="text-slate-400">-</span>}</span>,
     },
     {
+      header: "Notes",
+      className: "min-w-[220px] whitespace-normal",
+      cell: (l) => <NotesCell notes={l.notes} />,
+    },
+    {
       header: "Status",
       className: "min-w-[120px] whitespace-nowrap",
       cell: (l) => (
@@ -481,11 +486,6 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
         ) : (
           <span className="text-sm font-medium text-red-500">No</span>
         ),
-    },
-    {
-      header: "Notes",
-      className: "min-w-[220px] whitespace-normal",
-      cell: (l) => <NotesCell notes={l.notes} />,
     },
     { header: "Created", className: "min-w-[130px] whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.createdAt)}</span> },
     { header: "Updated", className: "min-w-[130px] whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.updatedAt)}</span> },

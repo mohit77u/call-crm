@@ -435,22 +435,6 @@ export function AgentLeadsBrowser() {
       cell: (l) => <EditableText value={l.email} onSave={(v) => saveField(l, { email: v || null })} inputClassName="w-52" validate={optionalEmail} />,
     },
     {
-      header: "Status",
-      cell: (l) => <StatusCell lead={l} onSave={(v) => saveField(l, { status: v })} />,
-    },
-    {
-      header: "Account created",
-      className: "min-w-[110px] whitespace-nowrap",
-      cell: (l) => (
-        <input
-          type="checkbox"
-          checked={l.accountCreated}
-          onChange={(e) => saveField(l, { accountCreated: e.target.checked })}
-          className="h-4 w-4 accent-[var(--primary)]"
-        />
-      ),
-    },
-    {
       header: "Notes",
       className: "min-w-[180px]",
       cell: (l) =>
@@ -484,6 +468,22 @@ export function AgentLeadsBrowser() {
             Add notes
           </span>
         ),
+    },
+    {
+      header: "Status",
+      cell: (l) => <StatusCell lead={l} onSave={(v) => saveField(l, { status: v })} />,
+    },
+    {
+      header: "Account created",
+      className: "min-w-[110px] whitespace-nowrap",
+      cell: (l) => (
+        <input
+          type="checkbox"
+          checked={l.accountCreated}
+          onChange={(e) => saveField(l, { accountCreated: e.target.checked })}
+          className="h-4 w-4 accent-[var(--primary)]"
+        />
+      ),
     },
     { header: "Assigned", className: "whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.assignedAt)}</span> },
     { header: "Created", className: "whitespace-nowrap", cell: (l) => <span className="muted text-sm">{fmtDate(l.createdAt)}</span> },
