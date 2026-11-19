@@ -569,7 +569,7 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
         <p className="mt-0.5 text-sm text-slate-500">{isAdmin ? "All clients across agents" : "Your client directory"}</p>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchInput value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Search clients…" className="w-full sm:max-w-xs" />
         {isAdmin ? (
           <AppSelect
