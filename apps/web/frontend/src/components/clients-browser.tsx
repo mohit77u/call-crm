@@ -26,24 +26,37 @@ export type ClientActions = {
 const PER_PAGE = 10;
 const ALL = "__all__";
 
-function ClampedText({ text, className = "text-slate-600" }: { text?: string | null; className?: string }) {
+function ClampedText({
+  text,
+  display,
+  capitalize = false,
+  lines = 2,
+  className = "text-slate-600",
+}: {
+  text?: string | null;
+  display?: string | null;
+  capitalize?: boolean;
+  lines?: 1 | 2;
+  className?: string;
+}) {
   const ref = useRef<HTMLSpanElement>(null);
   const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const check = () => setTruncated(el.scrollHeight - el.clientHeight > 1);
+    const check = () => setTruncated(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [text]);
+  }, [text, display]);
 
   if (!text) return <span className="text-sm text-slate-400">-</span>;
+  const shown = display ?? text;
   return (
     <Tooltip
-      label={<span className="whitespace-pre-wrap break-words">{text}</span>}
+      label={<span className={`whitespace-pre-wrap break-words ${capitalize ? "capitalize" : ""}`}>{shown}</span>}
       multiline
       w="auto"
       maw={400}
@@ -52,8 +65,11 @@ function ClampedText({ text, className = "text-slate-600" }: { text?: string | n
       openDelay={200}
       disabled={!truncated}
     >
-      <span ref={ref} className={`line-clamp-2 block text-sm ${className}`}>
-        {text}
+      <span
+        ref={ref}
+        className={`text-sm ${lines === 1 ? "block truncate" : "line-clamp-2 whitespace-normal! wrap-anywhere"} ${capitalize ? "capitalize" : ""} ${className}`}
+      >
+        {shown}
       </span>
     </Tooltip>
   );
@@ -483,7 +499,7 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       {
         header: "Name",
         className: "w-[180px] max-w-[180px]",
-        cell: (c) => <ClampedText text={c.name} className="font-medium text-slate-700" />,
+        cell: (c) => <ClampedText text={c.name?.replace(/\s+/g, " ")} display={c.name?.replace(/\s+/g, " ").toLowerCase()} capitalize lines={2} className="font-medium text-slate-700" />,
       },
       {
         header: "Phone",
@@ -492,13 +508,13 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       },
       {
         header: "Email",
-        className: "w-[200px] max-w-[200px]",
-        cell: (c) => <ClampedText text={c.email} />,
+        className: "w-[240px] max-w-[240px] whitespace-nowrap",
+        cell: (c) => <ClampedText text={c.email} lines={1} />,
       },
       {
         header: "Address",
-        className: "w-[200px] max-w-[200px]",
-        cell: (c) => <ClampedText text={c.address} className="text-slate-500" />,
+        className: "w-[240px] max-w-[240px]",
+        cell: (c) => <ClampedText text={c.address?.replace(/\s+/g, " ")} display={c.address?.replace(/\s+/g, " ").toLowerCase()} capitalize className="text-slate-500" />,
       },
       {
         header: "Pan card",
