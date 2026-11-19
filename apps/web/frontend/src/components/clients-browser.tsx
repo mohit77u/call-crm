@@ -26,19 +26,35 @@ export type ClientActions = {
 const PER_PAGE = 10;
 const ALL = "__all__";
 
-function AddressCell({ address }: { address: string | null }) {
-  if (!address) return <span className="text-sm text-slate-400">-</span>;
+function ClampedText({ text, className = "text-slate-600" }: { text?: string | null; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [truncated, setTruncated] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setTruncated(el.scrollHeight - el.clientHeight > 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text]);
+
+  if (!text) return <span className="text-sm text-slate-400">-</span>;
   return (
     <Tooltip
-      label={<span className="whitespace-pre-wrap break-words">{address}</span>}
+      label={<span className="whitespace-pre-wrap break-words">{text}</span>}
       multiline
       w="auto"
       maw={400}
       position="top"
       withArrow
       openDelay={200}
+      disabled={!truncated}
     >
-      <span className="block w-full truncate text-sm text-slate-500">{address}</span>
+      <span ref={ref} className={`line-clamp-2 block text-sm ${className}`}>
+        {text}
+      </span>
     </Tooltip>
   );
 }
@@ -466,8 +482,8 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       },
       {
         header: "Name",
-        className: "w-[180px] max-w-[180px] whitespace-nowrap",
-        cell: (c) => <span className="block truncate text-slate-700">{c.name}</span>,
+        className: "w-[180px] max-w-[180px]",
+        cell: (c) => <ClampedText text={c.name} className="font-medium text-slate-700" />,
       },
       {
         header: "Phone",
@@ -476,13 +492,13 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
       },
       {
         header: "Email",
-        className: "w-[200px] max-w-[200px] whitespace-nowrap",
-        cell: (c) => <span className="block truncate text-slate-600">{c.email}</span>,
+        className: "w-[200px] max-w-[200px]",
+        cell: (c) => <ClampedText text={c.email} />,
       },
       {
         header: "Address",
-        className: "w-[200px] max-w-[200px] whitespace-nowrap",
-        cell: (c) => <AddressCell address={c.address} />,
+        className: "w-[200px] max-w-[200px]",
+        cell: (c) => <ClampedText text={c.address} className="text-slate-500" />,
       },
       {
         header: "Pan card",
@@ -493,8 +509,8 @@ export function ClientsBrowser({ portal, actions }: { portal: "company" | "agent
     if (isAdmin) {
       cols.push({
         header: "Agent",
-        className: "w-[140px] max-w-[140px] whitespace-nowrap",
-        cell: (c) => <span className="block truncate text-slate-600">{c.agentName || "-"}</span>,
+        className: "w-[140px] max-w-[140px]",
+        cell: (c) => <ClampedText text={c.agentName} />,
       });
     }
     cols.push(
