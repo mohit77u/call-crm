@@ -442,21 +442,32 @@ export function CrmLeadsBrowser({ agents }: { agents: AgentOption[] }) {
     },
     {
       header: "Name",
-      className: "min-w-[140px] whitespace-nowrap",
-      cell: (l) => <span className="text-sm font-medium">{l.name}</span>,
+      className: "w-[190px] whitespace-nowrap",
+      cell: (l) => (
+        <Tooltip label={l.name} multiline w="auto" maw={340} position="top" withArrow openDelay={200} disabled={!l.name}>
+          <span className="block w-full truncate text-sm font-medium">{l.name}</span>
+        </Tooltip>
+      ),
     },
     {
       header: "Phone",
-      className: "w-[130px] whitespace-nowrap",
+      className: "w-[140px] whitespace-nowrap",
       cell: (l) => {
         const phone = fmtPhone(l.phone);
-        return <span className="text-sm">{phone || <span className="text-slate-400">-</span>}</span>;
+        return <span className="block w-full truncate text-sm">{phone || <span className="text-slate-400">-</span>}</span>;
       },
     },
     {
       header: "Email",
-      className: "min-w-[180px] whitespace-nowrap",
-      cell: (l) => <span className="text-sm">{l.email || <span className="text-slate-400">-</span>}</span>,
+      className: "w-[240px] whitespace-nowrap",
+      cell: (l) =>
+        l.email ? (
+          <Tooltip label={l.email} multiline w="auto" maw={340} position="top" withArrow openDelay={200}>
+            <span className="block w-full truncate text-sm">{l.email}</span>
+          </Tooltip>
+        ) : (
+          <span className="text-sm text-slate-400">-</span>
+        ),
     },
     {
       header: "Agent",

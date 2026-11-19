@@ -31,7 +31,8 @@ function EditableText({
   onSave,
   placeholder = "-",
   className = "",
-  inputClassName = "w-44",
+  inputClassName = "w-full",
+  multiline = false,
   validate,
 }: {
   value: string | null;
@@ -39,6 +40,7 @@ function EditableText({
   placeholder?: string;
   className?: string;
   inputClassName?: string;
+  multiline?: boolean;
   validate?: (v: string) => string | null;
 }) {
   const [editing, setEditing] = useState(false);
@@ -66,6 +68,7 @@ function EditableText({
     return (
       <input
         autoFocus
+        size={1}
         value={draft}
         disabled={pending}
         onChange={(e) => setDraft(e.target.value)}
@@ -77,21 +80,27 @@ function EditableText({
             setEditing(false);
           }
         }}
-        className={`h-8 rounded-md border border-[var(--primary)] bg-white px-2 text-sm text-slate-800 shadow-sm outline-none ${inputClassName}`}
+        className={`h-7 min-w-0 rounded-md border border-[var(--primary)] bg-white px-2 text-sm text-slate-800 shadow-sm outline-none ${inputClassName}`}
       />
     );
   }
-  return (
+  const display = (
     <span
       onClick={() => {
         setDraft(value ?? "");
         setEditing(true);
       }}
-      className={`block w-full cursor-text truncate rounded px-1 py-1 text-sm ${className}`}
-      title={value ?? undefined}
+      className={`block w-full cursor-text rounded px-1 py-1 text-sm ${multiline ? "line-clamp-2 break-words" : "truncate"} ${className}`}
     >
       {value || <span className="text-slate-400">{placeholder}</span>}
     </span>
+  );
+  return value ? (
+    <Tooltip label={value} multiline={multiline} w="auto" maw={340} position="top" withArrow openDelay={200}>
+      {display}
+    </Tooltip>
+  ) : (
+    display
   );
 }
 
@@ -126,7 +135,7 @@ function StatusCell({ lead, onSave }: { lead: LeadRow; onSave: (v: string) => Pr
     return (
       <div ref={wrapRef}>
         <AppSelect
-          className="w-36"
+          className="w-full"
           disabled={pending}
           defaultDropdownOpened
           value={lead.status}
@@ -421,18 +430,18 @@ export function AgentLeadsBrowser() {
   const columns: DataTableColumn<LeadRow>[] = [
     {
       header: "Name",
-      className: "min-w-[200px] whitespace-nowrap",
-      cell: (l) => <EditableText value={l.name} onSave={(v) => saveField(l, { name: v })} className="font-medium" inputClassName="w-44" validate={requireName} />,
+      className: "w-[210px] whitespace-normal",
+      cell: (l) => <EditableText value={l.name} onSave={(v) => saveField(l, { name: v })} className="font-medium" multiline validate={requireName} />,
     },
     {
       header: "Phone",
-      className: "min-w-[150px] whitespace-nowrap",
-      cell: (l) => <EditableText value={l.phone} onSave={(v) => saveField(l, { phone: v || null })} inputClassName="w-32" validate={optionalPhone} />,
+      className: "w-[160px] whitespace-nowrap",
+      cell: (l) => <EditableText value={l.phone} onSave={(v) => saveField(l, { phone: v || null })} validate={optionalPhone} />,
     },
     {
       header: "Email",
-      className: "min-w-[235px] whitespace-nowrap",
-      cell: (l) => <EditableText value={l.email} onSave={(v) => saveField(l, { email: v || null })} inputClassName="w-52" validate={optionalEmail} />,
+      className: "w-[240px] whitespace-nowrap",
+      cell: (l) => <EditableText value={l.email} onSave={(v) => saveField(l, { email: v || null })} inputClassName="w-[205px]" validate={optionalEmail} />,
     },
     {
       header: "Notes",
@@ -471,6 +480,7 @@ export function AgentLeadsBrowser() {
     },
     {
       header: "Status",
+      className: "w-[160px] whitespace-nowrap",
       cell: (l) => <StatusCell lead={l} onSave={(v) => saveField(l, { status: v })} />,
     },
     {
